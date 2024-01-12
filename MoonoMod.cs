@@ -30,17 +30,6 @@ namespace MoonoMod
         [HarmonyPatch]
         private static class HarmonyPatches
         {
-            // Enable both the full moon and Christmas timed content by telling the game that it's 2023-12-25.
-            [HarmonyPrefix]
-            [HarmonyPatch(typeof(DateTime), nameof(DateTime.Now), MethodType.Getter)]
-            private static bool DateTimeNow(ref DateTime __result)
-            {
-                // This date counts as a full moon AND Christmas.
-                __result = new(2023, 12, 25);
-
-                return false; // skip original method
-            }
-
             // Enable the March-August timed content by skipping the check. This is needed because the above patch sets the month to December.
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Season_Con), "OnEnable")]
