@@ -48,7 +48,7 @@ Each of the following features can be toggled on and off via configuration optio
 - **Force Christmas**: Force Christmas exclusive objects to appear on level load, and allow the Jingle Bells spell to be
   cast.
   - Jingle Bells can normally only be cast during December.
-  - The christmas present (Jingle Bells) norammly only appears December 25-31.
+  - The christmas present (Jingle Bells) normally only appears December 25-31.
   - Christmas decorations normally only appear December 10-31.
 - **Force Summer**: Force Summer exclusive objects to appear on level load.
   - As far as I can tell, this only makes Patchouli's horns have flowers. This naturally happens during the months of
