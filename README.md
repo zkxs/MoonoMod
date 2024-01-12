@@ -39,7 +39,7 @@ By default, only the **Force Full Moon** feature is enabled.
     - Ankou spawn.
     - Lunaga are replaced with Ga-Mangetsu.
   - Double player XP gain compared to new moon.
-  - 20x lunacy multiplier, compared to 0x at new moon.
+  - Maximum lunacy gain multiplier. You gain zero lunacy during a new moon.
   - Cursed Blade does maximum damage, but drains 1 player XP per attack.
   - Certain lights are recolored. Notably the Fetid Mire skylights are green, but during full moons they're purple.
   - Certain enemies that have moon-based health scaling will have their maximum health.
@@ -58,7 +58,7 @@ By default, only the **Force Full Moon** feature is enabled.
 
 <!--
 
-## Trivia
+## Bugs
 
 During the making of this mod I found a number of Lunacid bugs.
 
@@ -76,6 +76,13 @@ During the making of this mod I found a number of Lunacid bugs.
   different ways, and this difference can be exploited.
 
 -->
+
+## Bug Fixes
+
+- **Fix All-Spell Check**: Fixes the check that calculates if you have all spells. In vanilla, it counts spells that
+  aren't normally obtainable, such as the Jingle Bells and !DEVMODE spells. The bug means you might pass the all spell
+  check when you're still missing spells. Because this mod makes the Jingle Bells spell trivial to obtain, the bug
+  becomes a much larger issue than it'd normally be.
 
 ## License
 

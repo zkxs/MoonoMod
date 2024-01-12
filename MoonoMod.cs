@@ -23,7 +23,7 @@ namespace MoonoMod
         internal const string VERSION = "1.1.0";
 
         // Spells that should not count towards total spell count.
-        private static HashSet<string> SPELL_BLACKLIST = new(new string[]
+        private readonly static HashSet<string> SPELL_BLACKLIST = new(new string[]
         {
             "EMPTY", // I don't give a fuck if Kira thinks "EMPTY" is a spell. It's not.
             "SOARING SWIM",
@@ -34,8 +34,30 @@ namespace MoonoMod
             "JINGLE BELLS", // I can't believe that getting Jingle Bells can get you ending E when you're still missing a spell
         });
         private static int TOTAL_SPELL_COUNT = 0; // if remains on 0 and isn't updated, we'll just not do the relevant patches
-        private static int EXPECTED_TOTAL_SPELL_COUNT = 36;
-        private static string EXPECTED_VERSION = "1.1.2";
+        private readonly static int EXPECTED_TOTAL_SPELL_COUNT = 36;
+        private readonly static string EXPECTED_VERSION = "1.1.2";
+        private readonly static int SCALING_TYPE_MOON = 1;
+        private readonly static HashSet<string> SPECIAL_WEAPONS = new(new string[]
+        {
+            "JOTUNN SLAYER",
+            "DARK GREATSWORD",
+            "DOUBLE CROSSBOW",
+            "ELFEN LONGSWORD",
+            "FIRE SWORD",
+            "HERITAGE SWORD",
+            "IRON TORCH",
+            "LYRIAN GREATSWORD",
+            "MARAUDER BLACK FLAIL",
+            "POISON CLAW",
+            "SAINT ISHII",
+            "SHINING BLADE", // circular upgrade -> shadow blade
+            "SILVER RAPIER",
+            "STEEL CLUB",
+            "STEEL LANCE",
+            "SHADOW BLADE", // circular upgrade -> shining blade
+        });
+        private readonly static int EXPECTED_TOTAL_WEAPONS = 48;
+        private readonly static int EXPECTED_SPECIAL_WEAPONS = 15;
 
         private static new ManualLogSource? Logger;
 
@@ -61,7 +83,7 @@ namespace MoonoMod
 
                 if (Application.version != EXPECTED_VERSION)
                 {
-                    Logger.LogWarning($"Lunacid is on version {Application.version}, but {MOD_NAME} was built for Lunacid {EXPECTED_VERSION}. The mod may behave in unintended ways.");
+                    Logger.LogWarning($"Lunacid is on version {Application.version}, but {MOD_NAME} was built for Lunacid {EXPECTED_VERSION}. While {MOD_NAME} was designed to be as future-proof as reasonably possible, it may behave in unintended ways as I can't forsee every change Kira might make.");
                 }
 
                 Harmony harmony = new Harmony(GUID);
@@ -364,6 +386,30 @@ namespace MoonoMod
                 return false; // skip original method
             }
 
+            // Log total weapon progress
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(CONTROL), nameof(CONTROL.CheckForAllWeps))]
+            private static void CheckForAllWeps(CONTROL __instance, GameObject ___ACHY)
+            {
+                if (debugLogs!.Value)
+                {
+                    string[] weapons = __instance.CURRENT_PL_DATA.WEPS;
+
+                    int weapon_count = -1; // presumably Kira's way of dealing with EMPTY
+                    int special_weapon_count = 0;
+                    for (int index = 0; index < weapons.Length && weapons[index] != null && weapons[index] != ""; index += 1)
+                    {
+                        weapon_count += 1;
+                        if (SPECIAL_WEAPONS.Contains(weapons[index]))
+                        {
+                            special_weapon_count += 1;
+                        }
+                    }
+
+                    Logger!.LogInfo($"You have {weapon_count} / {EXPECTED_TOTAL_WEAPONS} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons.");
+                }
+            }
+
             // Fix the ending E check against if the player has all spells to not count normally unobtainable spells
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Ending_Switch), "Check")]
@@ -392,6 +438,7 @@ namespace MoonoMod
                 return false; // skip original method
             }
 
+            // log levels that contain full moon exclusive objects
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Spawn_if_moon), "OnEnable")]
             private static void LogMoonCheck(Spawn_if_moon __instance)
@@ -400,6 +447,29 @@ namespace MoonoMod
                 {
                     bool passed = __instance.MOON.MOON_MULT > 9.0;
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a full moon check. MOON_MULT = {__instance.MOON.MOON_MULT}. Pass = {passed}.");
+                }
+            }
+
+            // log levels that contain materials or lights affected by MOON_MULT
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(Moon_Light), "OnEnable")]
+            private static void LogMoonLight(Moon_Light __instance)
+            {
+                if (debugLogs!.Value)
+                {
+                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains {__instance.Mats.Length} materials and {__instance.Lights.Length} lights affected by MOON_MULT ({__instance.MOON.MOON_MULT}).");
+                }
+            }
+
+            // log levels that enemies with moon-based health scaling
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(NPC_Scaling), "Scale_NPC")]
+            private static void LogMoonHealth(NPC_Scaling __instance)
+            {
+                if (debugLogs!.Value && __instance.Scaling_Type == SCALING_TYPE_MOON)
+                {
+                    var scale_factor = Mathf.Lerp(1f, __instance.scale_str, __instance.MOON.MOON_MULT / 8f);
+                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains NPC {__instance.AI.gameObject.name} with health scaled by {scale_factor} to {__instance.AI.health_max} by MOON_MULT ({__instance.MOON.MOON_MULT}).");
                 }
             }
 
