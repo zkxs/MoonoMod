@@ -82,7 +82,7 @@ namespace MoonoMod
         [HarmonyPatch]
         private static class HarmonyPatches
         {
-            // Enable the March-August timed content by skipping the check. This is needed because the above patch sets the month to December.
+            // Enable the March-August timed content by skipping the check.
             // This is used to put some flowers on Patchouli's branch-horn-things.
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Season_Con), "OnEnable")]
@@ -102,7 +102,7 @@ namespace MoonoMod
                 return false; // skip original method
             }
 
-            // Skip the wait-a-month skeleton egg check. Normally it requires the month to change... except we've frozen the time to 2023-12-25 so it will never change.
+            // Skip the wait-a-month skeleton egg check. Normally it requires the month to change.
             // Also note that the vanilla code isn't making you wait a month... it's making you wait for the current month to CHANGE.
             [HarmonyPrefix]
             [HarmonyPatch(typeof(WaitAMonth), "Start")]
