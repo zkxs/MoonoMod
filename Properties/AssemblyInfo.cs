@@ -1,3 +1,7 @@
+// This file is part of MoonoMod and is licenced under the GNU GPL v3.0.
+// See LICENSE file for full text.
+// Copyright © 2024 Michael Ripley
+
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -9,7 +13,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("MoonoMod")]
-[assembly: AssemblyCopyright("Copyright ©  2024")]
+[assembly: AssemblyCopyright("Copyright © 2024")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -1,3 +1,7 @@
+// This file is part of MoonoMod and is licenced under the GNU GPL v3.0.
+// See LICENSE file for full text.
+// Copyright © 2024 Michael Ripley
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,9 +30,9 @@ namespace MoonoMod
 
             fullmoon = Config.Bind("General", "Force Full Moon", true, "Force full moon exclusive objects to appear on level load, and maximize the moon multiplier.");
             skipwaits = Config.Bind("General", "Skip Waits", false, "Force all checks to see if the player has waited some duration of time (sometimes minutes, somtimes months) to pass.");
-            christmas = Config.Bind("General", "Force Christmas", false, "Force Christmas exclusive objects to appear on level load, and allows the Jingle Bells spell to be cast.");
+            christmas = Config.Bind("General", "Force Christmas", false, "Force Christmas exclusive objects to appear on level load, and allow the Jingle Bells spell to be cast.");
             summer = Config.Bind("General", "Force Summer", false, "Force Summer exclusive objects to appear on level load.");
-            debugLogs = Config.Bind("Developer", "Enable Debug Logs", false, "Emit BepinEx logs when certain time checks are detected. Useful for figuring out which levels contain which checks.");
+            debugLogs = Config.Bind("Developer", "Enable Debug Logs", false, "Emit BepInEx logs when certain time checks are detected. Useful for figuring out which levels contain which checks.");
 
             Harmony harmony = new Harmony("dev.zkxs.moonomod");
             try
