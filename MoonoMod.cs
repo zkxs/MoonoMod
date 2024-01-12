@@ -11,6 +11,7 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace MoonoMod
 {
@@ -196,7 +197,7 @@ namespace MoonoMod
             {
                 if (debugLogs!.Value)
                 {
-                    Logger!.LogInfo("Level contains a Summer check");
+                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a Summer check.");
                 }
 
                 if (!summer!.Value)
@@ -222,7 +223,7 @@ namespace MoonoMod
                 {
                     if (debugLogs!.Value)
                     {
-                        Logger!.LogInfo("Level contains a wait-a-month check.");
+                        Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a wait-a-month check.");
                     }
 
                     if (!skipWaits!.Value)
@@ -250,7 +251,7 @@ namespace MoonoMod
                 {
                     if (debugLogs!.Value)
                     {
-                        Logger!.LogInfo($"Level contains a {__instance.length} minutes wait check.");
+                        Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a {__instance.length} minutes wait check.");
                     }
 
                     if (!skipWaits!.Value)
@@ -270,7 +271,7 @@ namespace MoonoMod
             {
                 if (debugLogs!.Value)
                 {
-                    Logger!.LogInfo("Level contains a Christmas check.");
+                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a Christmas check.");
                 }
 
                 if (!christmas!.Value)
@@ -368,6 +369,11 @@ namespace MoonoMod
             [HarmonyPatch(typeof(Ending_Switch), "Check")]
             private static bool EndingCheck(Ending_Switch __instance)
             {
+                if (debugLogs!.Value)
+                {
+                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains an ending check.");
+                }
+
                 if (!ShouldPatchSpellCount())
                 {
                     return true; // run original method
@@ -384,6 +390,17 @@ namespace MoonoMod
                     __instance.END_A.SetActive(true);
                 }
                 return false; // skip original method
+            }
+
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(Spawn_if_moon), "OnEnable")]
+            private static void LogMoonCheck(Spawn_if_moon __instance)
+            {
+                if (debugLogs!.Value)
+                {
+                    bool passed = __instance.MOON.MOON_MULT > 9.0;
+                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a full moon check. MOON_MULT = {__instance.MOON.MOON_MULT}. Pass = {passed}.");
+                }
             }
 
         }
