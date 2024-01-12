@@ -228,7 +228,6 @@ namespace MoonoMod
 
                 for (int index = 0; index < codes.Count; index++)
                 {
-                    // we've found the santa string, so now search for the next DateTime.Now call
                     if (codes[index].Calls(nowMethod))
                     {
                         // replace with a call to our faked DateTime.Now()
