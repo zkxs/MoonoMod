@@ -29,6 +29,8 @@ install).
 Each of the following features can be toggled on and off via configuration options, which can be edited in-game using
 [BepInEx.ConfigurationManager](https://github.com/BepInEx/BepInEx.ConfigurationManager).
 
+By default, only the **Force Full Moon** feature is enabled.
+
 - **Force Full Moon**: Force full moon exclusive objects to appear on level load, and maximize the moon multiplier.
   - The moon sprite in the main menu scene will be full.
   - Objects that only appear during full moon will appear.
