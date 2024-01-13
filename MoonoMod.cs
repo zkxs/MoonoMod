@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Reflection.Emit;
 using BepInEx;
 using BepInEx.Configuration;
@@ -22,53 +21,20 @@ namespace MoonoMod
         internal const string MOD_NAME = "MoonoMod";
         internal const string VERSION = "1.1.0";
 
-        // Spells that should not count towards total spell count.
-        private readonly static HashSet<string> SPELL_BLACKLIST = new(new string[]
-        {
-            "EMPTY", // I don't give a fuck if Kira thinks "EMPTY" is a spell. It's not.
-            "SOARING SWIM",
-            "DEV FORWARD",
-            "DEV XP",
-            "DEV RESET",
-            "DEV GODMODE",
-            "JINGLE BELLS", // I can't believe that getting Jingle Bells can get you ending E when you're still missing a spell
-        });
-        private static int TOTAL_SPELL_COUNT = 0; // if remains on 0 and isn't updated, we'll just not do the relevant patches
-        private readonly static int EXPECTED_TOTAL_SPELL_COUNT = 36;
         private readonly static string EXPECTED_VERSION = "1.1.2";
         private readonly static int SCALING_TYPE_MOON = 1;
 
-        // this is the same as the vanilla list, except the circular upgrade weapons "SHINING BLADE" and "SHADOW BLADE" are removed, as they have numbers appended if they have nonzero weapon XP which breaks Kira's check.
-        private readonly static HashSet<string> SPECIAL_WEAPONS = new(new string[]
-        {
-            "JOTUNN SLAYER",
-            "DARK GREATSWORD",
-            "DOUBLE CROSSBOW",
-            "ELFEN LONGSWORD",
-            "FIRE SWORD",
-            "HERITAGE SWORD",
-            "IRON TORCH",
-            "LYRIAN GREATSWORD",
-            "MARAUDER BLACK FLAIL",
-            "POISON CLAW",
-            "SAINT ISHII",
-            "SILVER RAPIER",
-            "STEEL CLUB",
-            "STEEL LANCE",
-        });
-        private static int TOTAL_WEAPON_COUNT = 0; // if remains on 0 and isn't updated, we'll just not do the relevant patches
-        private readonly static int EXPECTED_TOTAL_WEAPONS = 48; // fun fact: I count 50 obtainable weapons. Maybe 51 if you can get both an Obsidian Cursebrand and Obsidian Poisonguard to drop. So I have no idea where Kira got 48 from.
-        private readonly static int EXPECTED_SPECIAL_WEAPONS = SPECIAL_WEAPONS.Count;
+        internal static new ManualLogSource? Logger;
 
-        private static new ManualLogSource? Logger;
-
-        private static ConfigEntry<bool>? fullMoon;
-        private static ConfigEntry<bool>? skipWaits;
-        private static ConfigEntry<bool>? christmas;
-        private static ConfigEntry<bool>? summer;
-        private static ConfigEntry<bool>? fixAllSpellCheck;
-        private static ConfigEntry<bool>? fixAllWeaponCheck;
-        private static ConfigEntry<bool>? debugLogs;
+        internal static ConfigEntry<bool>? fullMoon;
+        internal static ConfigEntry<bool>? skipWaits;
+        internal static ConfigEntry<bool>? christmas;
+        internal static ConfigEntry<bool>? summer;
+        internal static ConfigEntry<bool>? fixAllSpellCheck;
+        internal static ConfigEntry<bool>? fixAllWeaponCheck;
+        internal static ConfigEntry<bool>? allLoot;
+        internal static ConfigEntry<bool>? debugLogs;
+        internal static ConfigEntry<bool>? verboseLogs;
 
         private void Awake()
         {
@@ -82,7 +48,9 @@ namespace MoonoMod
                 summer = Config.Bind("General", "Force Summer", false, "Force Summer exclusive objects to appear on level load.");
                 fixAllSpellCheck = Config.Bind("Bugfixes", "Fix All-Spell Check", true, "Fix the all-spell check to not include normally unobtainable spells in your total.");
                 fixAllWeaponCheck = Config.Bind("Bugfixes", "Fix All-Weapon Check", true, "Fix the all-weapon check to not not break if your Shadow/Shining blade has nonzero weapon XP.");
+                allLoot = Config.Bind("Cheats", "Drop All Loot", false, "Enemies drop everything in their loot table when killed.");
                 debugLogs = Config.Bind("Developer", "Enable Debug Logs", false, "Emit BepInEx logs when certain time checks are detected. Useful for figuring out which levels contain which checks.");
+                verboseLogs = Config.Bind("Developer", "Enable Verbose Logs", false, "Emit BepInEx logs that help learn the names of all spells and weapons.");
 
                 if (Application.version != EXPECTED_VERSION)
                 {
@@ -91,31 +59,8 @@ namespace MoonoMod
 
                 Harmony harmony = new Harmony(GUID);
 
-                try
-                {
-                    TOTAL_SPELL_COUNT = ComputeTotalSpellCount();
-                }
-                catch (TranspilerException e)
-                {
-                    Logger.LogWarning($"Disabling total spell count fix due to error:\n{e}");
-                }
-                if (TOTAL_SPELL_COUNT != EXPECTED_TOTAL_SPELL_COUNT)
-                {
-                    Logger.LogWarning($"Found evidence of {TOTAL_SPELL_COUNT} spells, but expected {EXPECTED_TOTAL_SPELL_COUNT}. Kira may have added new spells or fixed the spell count bug this mod fixes.");
-                }
-
-                try
-                {
-                    TOTAL_WEAPON_COUNT = ComputeTotalWeaponCount();
-                }
-                catch (TranspilerException e)
-                {
-                    Logger.LogWarning($"Disabling total weapon count fix due to error:\n{e}");
-                }
-                if (TOTAL_WEAPON_COUNT != EXPECTED_TOTAL_WEAPONS)
-                {
-                    Logger.LogWarning($"Found evidence of {TOTAL_WEAPON_COUNT} weapons, but expected {EXPECTED_TOTAL_WEAPONS}. Kira may have added new weapons or fixed the weapon count bug this mod fixes.");
-                }
+                AllSpells.Init();
+                AllWeapons.Init();
 
                 harmony.PatchAll();
                 Logger.LogInfo("You're about to hack time, are you sure?"); // kung fury quote
@@ -157,137 +102,6 @@ namespace MoonoMod
             {
                 return DateTime.Now;
             }
-        }
-
-        // get total spell count in a dynamic way. This is non-trivial, because the spells are unloaded in an asset bundle and Unity 2020.3.4f1 has no way to enumerate them.
-        // instead we'll just read how many spells Kira thinks there are, because he's got a hardcoded count lying around.
-        private static int ComputeTotalSpellCount()
-        {
-            MethodInfo hasAllSpells = AccessTools.DeclaredMethod(typeof(CONTROL), nameof(CONTROL.CheckForAllSpells));
-            List<CodeInstruction> codes = PatchProcessor.GetOriginalInstructions(hasAllSpells);
-
-            // sliding window search for ldc.i4.s, blt.s
-            for (int index = codes.Count - 1; index > 0; index -= 1)
-            {
-                if ((codes[index - 1].opcode == OpCodes.Ldc_I4 || codes[index - 1].opcode == OpCodes.Ldc_I4_S) && (codes[index].opcode == OpCodes.Blt || codes[index].opcode == OpCodes.Blt_S))
-                {
-                    object totalSpellCount = codes[index - 1].operand;
-
-                    try
-                    {
-                        // handle normal LDC
-                        return (int)totalSpellCount;
-                    }
-                    catch
-                    {
-                    }
-
-                    try
-                    {
-                        // handle short-form LDC
-                        return (sbyte)totalSpellCount;
-                    }
-                    catch
-                    {
-                    }
-
-                    throw new TranspilerException($"Could not extract int from {totalSpellCount.GetType()} when trying to read total spell count");
-                }
-            }
-
-            throw new TranspilerException("Could not read total spell count");
-        }
-
-        // get total weapon count in a dynamic way. This is non-trivial, because the weapons are unloaded in an asset bundle and Unity 2020.3.4f1 has no way to enumerate them.
-        // instead we'll just read how many weapons Kira thinks there are, because he's got a hardcoded count lying around.
-        private static int ComputeTotalWeaponCount()
-        {
-            MethodInfo hasAllWeapons = AccessTools.DeclaredMethod(typeof(CONTROL), nameof(CONTROL.CheckForAllWeps));
-            List<CodeInstruction> codes = PatchProcessor.GetOriginalInstructions(hasAllWeapons);
-
-            // sliding window search for ldc.i4.s, blt.s
-            for (int index = codes.Count - 1; index > 0; index -= 1)
-            {
-                if ((codes[index - 1].opcode == OpCodes.Ldc_I4 || codes[index - 1].opcode == OpCodes.Ldc_I4_S) && (codes[index].opcode == OpCodes.Blt || codes[index].opcode == OpCodes.Blt_S))
-                {
-                    object totalWeaponCount = codes[index - 1].operand;
-
-                    try
-                    {
-                        // handle normal LDC
-                        return (int)totalWeaponCount;
-                    }
-                    catch
-                    {
-                    }
-
-                    try
-                    {
-                        // handle short-form LDC
-                        return (sbyte)totalWeaponCount;
-                    }
-                    catch
-                    {
-                    }
-
-                    throw new TranspilerException($"Could not extract int from {totalWeaponCount.GetType()} when trying to read total weapon count");
-                }
-            }
-
-            throw new TranspilerException("Could not read total weapon count");
-        }
-
-        private static bool ShouldPatchSpellCount()
-        {
-            return fixAllSpellCheck!.Value && TOTAL_SPELL_COUNT != 0;
-        }
-
-        private static bool ShouldPatchWeaponCount()
-        {
-            return fixAllWeaponCheck!.Value && TOTAL_WEAPON_COUNT != 0;
-        }
-
-        private static bool HasAllSpells(CONTROL control)
-        {
-            string[] spells = control.CURRENT_PL_DATA.SPELLS;
-            int spell_count = 0;
-            for (int index = 0; index < spells.Length && spells[index] != null && spells[index] != ""; index += 1)
-            {
-                if (!SPELL_BLACKLIST.Contains(spells[index]))
-                {
-                    spell_count += 1;
-                }
-            }
-
-            if (debugLogs!.Value)
-            {
-                Logger!.LogInfo($"You have {spell_count} / {TOTAL_SPELL_COUNT} spells");
-            }
-
-            return spell_count >= TOTAL_SPELL_COUNT;
-        }
-
-        private static bool HasAllWeapons(CONTROL control)
-        {
-            string[] weapons = control.CURRENT_PL_DATA.WEPS;
-
-            int weapon_count = -1; // presumably Kira's way of dealing with EMPTY
-            int special_weapon_count = 0;
-            for (int index = 0; index < weapons.Length && weapons[index] != null && weapons[index] != ""; index += 1)
-            {
-                weapon_count += 1;
-                if (SPECIAL_WEAPONS.Contains(weapons[index]))
-                {
-                    special_weapon_count += 1;
-                }
-            }
-
-            if (debugLogs!.Value)
-            {
-                Logger!.LogInfo($"You have {weapon_count} / {TOTAL_WEAPON_COUNT} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons.");
-            }
-
-            return weapon_count >= TOTAL_WEAPON_COUNT && special_weapon_count >= EXPECTED_SPECIAL_WEAPONS;
         }
 
         [HarmonyPatch]
@@ -454,62 +268,6 @@ namespace MoonoMod
                 }
             }
 
-            // Fix the achievement check against if the player has all spells to not count normally unobtainable spells
-            [HarmonyPrefix]
-            [HarmonyPatch(typeof(CONTROL), nameof(CONTROL.CheckForAllSpells))]
-            private static bool AllSpellsAchievement(CONTROL __instance, GameObject ___ACHY)
-            {
-                if (!ShouldPatchSpellCount())
-                {
-                    return true; // run original method
-                }
-
-                ___ACHY?.transform.GetChild(1).gameObject.SetActive(HasAllSpells(__instance));
-                return false; // skip original method
-            }
-
-            // Log total weapon progress
-            [HarmonyPrefix]
-            [HarmonyPatch(typeof(CONTROL), nameof(CONTROL.CheckForAllWeps))]
-            private static bool CheckForAllWeps(CONTROL __instance, GameObject ___ACHY)
-            {
-                if (!ShouldPatchWeaponCount())
-                {
-                    return true; // run original method
-                }
-
-                ___ACHY?.transform.GetChild(0).gameObject.SetActive(HasAllWeapons(__instance));
-                return false; // skip original method
-            }
-
-            // Fix the ending E check against if the player has all spells to not count normally unobtainable spells
-            [HarmonyPrefix]
-            [HarmonyPatch(typeof(Ending_Switch), "Check")]
-            private static bool EndingCheck(Ending_Switch __instance)
-            {
-                if (debugLogs!.Value)
-                {
-                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains an ending check.");
-                }
-
-                if (!ShouldPatchSpellCount())
-                {
-                    return true; // run original method
-                }
-
-                if (HasAllSpells(__instance.CON))
-                {
-                    __instance.END_E.SetActive(true);
-                    __instance.END_A.SetActive(false);
-                }
-                else
-                {
-                    __instance.END_E.SetActive(false);
-                    __instance.END_A.SetActive(true);
-                }
-                return false; // skip original method
-            }
-
             // log levels that contain full moon exclusive objects
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Spawn_if_moon), "OnEnable")]
@@ -545,11 +303,31 @@ namespace MoonoMod
                 }
             }
 
-        }
+            // drop all possible loot from an enemy except just one item from the loot table. THIS IS CHEATING!
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(Loot_scr), "OnEnable")]
+            private static bool AllLoot(Loot_scr __instance)
+            {
+                if (!allLoot!.Value)
+                {
+                    return true; // run original method
+                }
 
-        private class TranspilerException : Exception
-        {
-            public TranspilerException(string message) : base(message) { }
+                for (int index = 0; index < __instance.LOOTS.Length; index += 1)
+                {
+                    if (__instance.LOOTS[index].ITEM != null)
+                    {
+                        GameObject gameObject = Instantiate(__instance.LOOTS[index].ITEM, __instance.transform.position, Quaternion.identity);
+                        gameObject.SetActive(false);
+                        gameObject.AddComponent<Place_on_Ground>();
+                        gameObject.GetComponent<Place_on_Ground>().LOOTED = true;
+                        gameObject.SetActive(true);
+                    }
+                }
+
+                return false; // skip original method
+            }
+
         }
 
     }
