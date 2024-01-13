@@ -79,10 +79,17 @@ During the making of this mod I found a number of Lunacid bugs.
 
 ## Bug Fixes
 
+All bug fixes are enabled by default. They can be manually disabled via the configuration (which again, can be edited
+in-game using [BepInEx.ConfigurationManager](https://github.com/BepInEx/BepInEx.ConfigurationManager)). Additionaly, the
+bug fixes have some safety checks to try and detect if future versions of Lunacid are incompatible with my bug fixes. If
+these checks fail, the bug fixes will automatically disable and vanilla behavior will be used instead.
+
 - **Fix All-Spell Check**: Fixes the check that calculates if you have all spells. In vanilla, it counts spells that
   aren't normally obtainable, such as the Jingle Bells and !DEVMODE spells. The bug means you might pass the all spell
   check when you're still missing spells. Because this mod makes the Jingle Bells spell trivial to obtain, the bug
   becomes a much larger issue than it'd normally be.
+- **Fix All-Weapon Check**: Fixes the check that calculates if you have all weapons. In vanilla, the check breaks if the
+  Shadow/Shining blade has nonzero weapon XP.
 
 ## License
 

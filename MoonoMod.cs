@@ -37,6 +37,8 @@ namespace MoonoMod
         private readonly static int EXPECTED_TOTAL_SPELL_COUNT = 36;
         private readonly static string EXPECTED_VERSION = "1.1.2";
         private readonly static int SCALING_TYPE_MOON = 1;
+
+        // this is the same as the vanilla list, except the circular upgrade weapons "SHINING BLADE" and "SHADOW BLADE" are removed, as they have numbers appended if they have nonzero weapon XP which breaks Kira's check.
         private readonly static HashSet<string> SPECIAL_WEAPONS = new(new string[]
         {
             "JOTUNN SLAYER",
@@ -50,14 +52,13 @@ namespace MoonoMod
             "MARAUDER BLACK FLAIL",
             "POISON CLAW",
             "SAINT ISHII",
-            "SHINING BLADE", // circular upgrade -> shadow blade
             "SILVER RAPIER",
             "STEEL CLUB",
             "STEEL LANCE",
-            "SHADOW BLADE", // circular upgrade -> shining blade
         });
-        private readonly static int EXPECTED_TOTAL_WEAPONS = 48;
-        private readonly static int EXPECTED_SPECIAL_WEAPONS = 15;
+        private static int TOTAL_WEAPON_COUNT = 0; // if remains on 0 and isn't updated, we'll just not do the relevant patches
+        private readonly static int EXPECTED_TOTAL_WEAPONS = 48; // fun fact: I count 50 obtainable weapons. Maybe 51 if you can get both an Obsidian Cursebrand and Obsidian Poisonguard to drop. So I have no idea where Kira got 48 from.
+        private readonly static int EXPECTED_SPECIAL_WEAPONS = SPECIAL_WEAPONS.Count;
 
         private static new ManualLogSource? Logger;
 
@@ -66,6 +67,7 @@ namespace MoonoMod
         private static ConfigEntry<bool>? christmas;
         private static ConfigEntry<bool>? summer;
         private static ConfigEntry<bool>? fixAllSpellCheck;
+        private static ConfigEntry<bool>? fixAllWeaponCheck;
         private static ConfigEntry<bool>? debugLogs;
 
         private void Awake()
@@ -79,6 +81,7 @@ namespace MoonoMod
                 christmas = Config.Bind("General", "Force Christmas", false, "Force Christmas exclusive objects to appear on level load, and allow the Jingle Bells spell to be cast.");
                 summer = Config.Bind("General", "Force Summer", false, "Force Summer exclusive objects to appear on level load.");
                 fixAllSpellCheck = Config.Bind("Bugfixes", "Fix All-Spell Check", true, "Fix the all-spell check to not include normally unobtainable spells in your total.");
+                fixAllWeaponCheck = Config.Bind("Bugfixes", "Fix All-Weapon Check", true, "Fix the all-weapon check to not not break if your Shadow/Shining blade has nonzero weapon XP.");
                 debugLogs = Config.Bind("Developer", "Enable Debug Logs", false, "Emit BepInEx logs when certain time checks are detected. Useful for figuring out which levels contain which checks.");
 
                 if (Application.version != EXPECTED_VERSION)
@@ -96,10 +99,22 @@ namespace MoonoMod
                 {
                     Logger.LogWarning($"Disabling total spell count fix due to error:\n{e}");
                 }
-
                 if (TOTAL_SPELL_COUNT != EXPECTED_TOTAL_SPELL_COUNT)
                 {
-                    Logger.LogWarning($"Found evidence of {TOTAL_SPELL_COUNT} spells, but expected {EXPECTED_TOTAL_SPELL_COUNT}. Kira may have fixed the spell count bugs this mod fixes.");
+                    Logger.LogWarning($"Found evidence of {TOTAL_SPELL_COUNT} spells, but expected {EXPECTED_TOTAL_SPELL_COUNT}. Kira may have added new spells or fixed the spell count bug this mod fixes.");
+                }
+
+                try
+                {
+                    TOTAL_WEAPON_COUNT = ComputeTotalWeaponCount();
+                }
+                catch (TranspilerException e)
+                {
+                    Logger.LogWarning($"Disabling total weapon count fix due to error:\n{e}");
+                }
+                if (TOTAL_WEAPON_COUNT != EXPECTED_TOTAL_WEAPONS)
+                {
+                    Logger.LogWarning($"Found evidence of {TOTAL_WEAPON_COUNT} weapons, but expected {EXPECTED_TOTAL_WEAPONS}. Kira may have added new weapons or fixed the weapon count bug this mod fixes.");
                 }
 
                 harmony.PatchAll();
@@ -183,12 +198,56 @@ namespace MoonoMod
             throw new TranspilerException("Could not read total spell count");
         }
 
+        // get total weapon count in a dynamic way. This is non-trivial, because the weapons are unloaded in an asset bundle and Unity 2020.3.4f1 has no way to enumerate them.
+        // instead we'll just read how many weapons Kira thinks there are, because he's got a hardcoded count lying around.
+        private static int ComputeTotalWeaponCount()
+        {
+            MethodInfo hasAllWeapons = AccessTools.DeclaredMethod(typeof(CONTROL), nameof(CONTROL.CheckForAllWeps));
+            List<CodeInstruction> codes = PatchProcessor.GetOriginalInstructions(hasAllWeapons);
+
+            // sliding window search for ldc.i4.s, blt.s
+            for (int index = codes.Count - 1; index > 0; index -= 1)
+            {
+                if ((codes[index - 1].opcode == OpCodes.Ldc_I4 || codes[index - 1].opcode == OpCodes.Ldc_I4_S) && (codes[index].opcode == OpCodes.Blt || codes[index].opcode == OpCodes.Blt_S))
+                {
+                    object totalWeaponCount = codes[index - 1].operand;
+
+                    try
+                    {
+                        // handle normal LDC
+                        return (int)totalWeaponCount;
+                    }
+                    catch
+                    {
+                    }
+
+                    try
+                    {
+                        // handle short-form LDC
+                        return (sbyte)totalWeaponCount;
+                    }
+                    catch
+                    {
+                    }
+
+                    throw new TranspilerException($"Could not extract int from {totalWeaponCount.GetType()} when trying to read total weapon count");
+                }
+            }
+
+            throw new TranspilerException("Could not read total weapon count");
+        }
+
         private static bool ShouldPatchSpellCount()
         {
             return fixAllSpellCheck!.Value && TOTAL_SPELL_COUNT != 0;
         }
 
-        public static bool HasAllSpells(CONTROL control)
+        private static bool ShouldPatchWeaponCount()
+        {
+            return fixAllWeaponCheck!.Value && TOTAL_WEAPON_COUNT != 0;
+        }
+
+        private static bool HasAllSpells(CONTROL control)
         {
             string[] spells = control.CURRENT_PL_DATA.SPELLS;
             int spell_count = 0;
@@ -206,6 +265,29 @@ namespace MoonoMod
             }
 
             return spell_count >= TOTAL_SPELL_COUNT;
+        }
+
+        private static bool HasAllWeapons(CONTROL control)
+        {
+            string[] weapons = control.CURRENT_PL_DATA.WEPS;
+
+            int weapon_count = -1; // presumably Kira's way of dealing with EMPTY
+            int special_weapon_count = 0;
+            for (int index = 0; index < weapons.Length && weapons[index] != null && weapons[index] != ""; index += 1)
+            {
+                weapon_count += 1;
+                if (SPECIAL_WEAPONS.Contains(weapons[index]))
+                {
+                    special_weapon_count += 1;
+                }
+            }
+
+            if (debugLogs!.Value)
+            {
+                Logger!.LogInfo($"You have {weapon_count} / {TOTAL_WEAPON_COUNT} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons.");
+            }
+
+            return weapon_count >= TOTAL_WEAPON_COUNT && special_weapon_count >= EXPECTED_SPECIAL_WEAPONS;
         }
 
         [HarmonyPatch]
@@ -389,25 +471,15 @@ namespace MoonoMod
             // Log total weapon progress
             [HarmonyPrefix]
             [HarmonyPatch(typeof(CONTROL), nameof(CONTROL.CheckForAllWeps))]
-            private static void CheckForAllWeps(CONTROL __instance, GameObject ___ACHY)
+            private static bool CheckForAllWeps(CONTROL __instance, GameObject ___ACHY)
             {
-                if (debugLogs!.Value)
+                if (!ShouldPatchWeaponCount())
                 {
-                    string[] weapons = __instance.CURRENT_PL_DATA.WEPS;
-
-                    int weapon_count = -1; // presumably Kira's way of dealing with EMPTY
-                    int special_weapon_count = 0;
-                    for (int index = 0; index < weapons.Length && weapons[index] != null && weapons[index] != ""; index += 1)
-                    {
-                        weapon_count += 1;
-                        if (SPECIAL_WEAPONS.Contains(weapons[index]))
-                        {
-                            special_weapon_count += 1;
-                        }
-                    }
-
-                    Logger!.LogInfo($"You have {weapon_count} / {EXPECTED_TOTAL_WEAPONS} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons.");
+                    return true; // run original method
                 }
+
+                ___ACHY?.transform.GetChild(0).gameObject.SetActive(HasAllWeapons(__instance));
+                return false; // skip original method
             }
 
             // Fix the ending E check against if the player has all spells to not count normally unobtainable spells
