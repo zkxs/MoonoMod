@@ -15,7 +15,7 @@ The name of this project is a riff on [MonoMod](https://github.com/MonoMod/MonoM
 1. Install [BepInEx 5](https://github.com/BepInEx/BepInEx) into your Lunacid game folder. This mod is NOT made for
    BepInEx 6.
 2. Add [MoonoMod.dll](https://github.com/zkxs/MoonoMod/releases/latest/download/MoonoMod.dll) to your BepInEx `plugins`
-   folder. If it `plugins` doesn't exist, simply create the folder inside your `BepInEx` folder.
+   folder. If `plugins` doesn't exist, simply create the folder inside your `BepInEx` folder.
 3. If you wish to edit the configs in-game, install
    [BepInEx.ConfigurationManager](https://github.com/BepInEx/BepInEx.ConfigurationManager) to your `plugins` folder as
    well.
