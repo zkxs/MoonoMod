@@ -32,6 +32,7 @@ namespace MoonoMod
         });
 
         // there's 51 distinct weapons you can technically have. Also you can have duplicates... Kira checks for 48. Which 3 didn't they want to count?
+        // Kira probably doesn't know about the drop duping bug that would let you have both the CURSEBRAND and the POISONGUARD, so really it's just 50 weapons you can have.
         private readonly static HashSet<string> TERMINAL_WEAPONS = new(new string[] {
             "EMPTY", // included for completeness
             "AXE OF HARMING",
@@ -52,12 +53,12 @@ namespace MoonoMod
             "GOLDEN KHOPESH",
             "GOLDEN SICKLE",
             "HALBERD",
-            "HAMMER OF CRUELTY",
             "HERITAGE SWORD",
             "ICE SICKLE",
             "IRON TORCH",
             "JAILORS CANDLE",
             "JOTUNN SLAYER",
+            "LIMBO", // might be considered secret?
             "LUCID BLADE",
             "LYRIAN GREATSWORD",
             "MARAUDER BLACK FLAIL",
@@ -83,12 +84,12 @@ namespace MoonoMod
         });
 
         // My best guess as to the weapons Kira didn't want to count in the 48
-        private readonly static HashSet<string> SECRET_WEAPONS = new(new string[] {
-            "DEATH SCYTHE", // numeric suffix. Might be considered secret?
-            "LIMBO", // might be considered secret?
+        private readonly static HashSet<string> LOSABLE_WEAPONS = new(new string[] {
+            "DEATH SCYTHE", // numeric suffix. Might be considered secret?. Lost when you restore Death.
+            "HAMMER OF CRUELTY", // Lost if you return it to Garrat.
         });
 
-        // player must have AT LEAST one of these two... because oh my god you can have infinite of these in your inventory
+        // player must have AT LEAST one of these two
         private readonly static HashSet<string> OBSIDIAN_WEAPONS = new(new string[] {
             "OBSIDIAN CURSEBRAND", // numeric suffix
             "OBSIDIAN POISONGUARD", // numeric suffix

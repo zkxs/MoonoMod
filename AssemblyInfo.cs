@@ -36,5 +36,5 @@ using static MoonoMod.MoonoMod;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion(VERSION)]
-[assembly: AssemblyFileVersion(VERSION)]
+[assembly: AssemblyVersion(MOD_VERSION)]
+[assembly: AssemblyFileVersion(MOD_VERSION)]

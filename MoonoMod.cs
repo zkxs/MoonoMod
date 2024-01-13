@@ -17,12 +17,12 @@ using UnityEngine.SceneManagement;
 
 namespace MoonoMod
 {
-    [BepInPlugin(GUID, MOD_NAME, VERSION)]
+    [BepInPlugin(GUID, MOD_NAME, MOD_VERSION)]
     public class MoonoMod : BaseUnityPlugin
     {
         internal const string GUID = "dev.zkxs.moonomod";
         internal const string MOD_NAME = "MoonoMod";
-        internal const string VERSION = "1.1.0";
+        internal const string MOD_VERSION = "1.1.1";
 
         private readonly static string EXPECTED_LUNACID_VERSION = "1.1.2";
         private readonly static int SCALING_TYPE_MOON = 1;

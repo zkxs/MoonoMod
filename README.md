@@ -74,6 +74,9 @@ During the making of this mod I found a number of Lunacid bugs.
 - If you set your player name to `!xdevmode` you get all the benefits of the `!devmode` player name and you also bypass
   the check that prevents you from doing the Tower of Abyss. This is because the name checks are done in slightly
   different ways, and this difference can be exploited.
+- You can obtain both the Obsidian Poisonguard *and* the Obsidian Cursebrand. It's just highly improbable and involves
+  exploiting a bug. You'd need to kill both obsidian skeletons and have one drop the cursebrand and the other drop the
+  poisonguard before you pick the drops up off the ground. There's a 0.3% chance you can get away with this.
 
 -->
 
@@ -90,9 +93,8 @@ these checks fail, the bug fixes will automatically disable and vanilla behavior
   becomes a much larger issue than it'd normally be.
 - **Fix All-Weapon Check**: Fixes the check that calculates if you have all weapons. In vanilla, the check breaks if the
   Shadow/Shining blade has nonzero weapon XP. Also, Kira checks to make sure you have 48 or more weapons... but it's 
-  possible to obtain at least 51 distinct weapons. My best guess its that Kira overlooked the fact that you can have
-  both the Obsidian Cursebrand and the Obsidian Posisonguard, as well as failing to count two certain very secret
-  weapons that require you to obtain the Broken Sword first.
+  possible to obtain 50 distinct weapons. My best guess its that Kira didn't want to count the two weapons you can lose
+  later.
 
 ## License
 
