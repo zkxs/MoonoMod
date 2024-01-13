@@ -9,7 +9,7 @@ namespace MoonoMod
 {
     internal class AllSpells
     {
-        // Spells that should NOT count towards total spell count.
+        // Spells that should NOT count towards total spell count of 36.
         private readonly static HashSet<string> SPELL_BLACKLIST = new(new string[]
         {
             "EMPTY", // I don't give a fuck if Kira thinks "EMPTY" is a spell. It's not.
@@ -22,9 +22,9 @@ namespace MoonoMod
         });
 
         // the 36 Lunacid 1.1.2 spells
-        private readonly static HashSet<string> SPELL_WHITELIST = new(new string[]
+        private readonly static HashSet<string> ALL_SPELLS = new(new string[]
         {
-            "EMPTY",
+            "EMPTY", // included for completeness
             "BARRIER",
             "BESTIAL COMMUNION",
             "BLOOD DRAIN",
@@ -132,14 +132,17 @@ namespace MoonoMod
         private static bool HasAllSpells(CONTROL control)
         {
             string[] spells = control.CURRENT_PL_DATA.SPELLS;
+            HashSet<string> spellSet = new();
             int spell_count = 0;
             for (int index = 0; index < spells.Length && spells[index] != null && spells[index] != ""; index += 1)
             {
                 // log ALL spells
-                if (MoonoMod.verboseLogs!.Value)
+                if (MoonoMod.debugInventory?.Value ?? false)
                 {
-                    MoonoMod.Logger!.LogMessage(spells[index]);
+                    MoonoMod.Logger!.LogMessage($"you have {spells[index]}");
                 }
+
+                spellSet.Add(spells[index]);
 
                 if (!SPELL_BLACKLIST.Contains(spells[index]))
                 {
@@ -147,12 +150,26 @@ namespace MoonoMod
                 }
             }
 
-            if (MoonoMod.debugLogs!.Value)
+            if (MoonoMod.debugLogs?.Value ?? false)
             {
+                HashSet<string> missingSpells = new(ALL_SPELLS);
+                missingSpells.ExceptWith(spellSet);
                 MoonoMod.Logger!.LogInfo($"You have {spell_count} / {TOTAL_SPELL_COUNT} spells");
-            }
 
-            return spell_count >= TOTAL_SPELL_COUNT;
+                if (MoonoMod.debugInventory?.Value ?? false)
+                {
+                    foreach (string missingSpell in missingSpells)
+                    {
+                        MoonoMod.Logger!.LogInfo($"missing {missingSpell}");
+                    }
+                }
+
+                return missingSpells.Count != 0;
+            }
+            else
+            {
+                return spellSet.IsSupersetOf(ALL_SPELLS);
+            }
         }
 
         [HarmonyPatch]
@@ -177,7 +194,7 @@ namespace MoonoMod
             [HarmonyPatch(typeof(Ending_Switch), "Check")]
             private static bool EndingCheck(Ending_Switch __instance)
             {
-                if (MoonoMod.debugLogs!.Value)
+                if (MoonoMod.debugLogs?.Value ?? false)
                 {
                     MoonoMod.Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains an ending check.");
                 }

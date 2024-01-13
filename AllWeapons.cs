@@ -29,7 +29,7 @@ namespace MoonoMod
 
         // there's 51 distinct weapons you can technically have. Also you can have duplicates... Kira checks for 48. Which 3 didn't they want to count?
         private readonly static HashSet<string> TERMINAL_WEAPONS = new(new string[] {
-            "EMPTY",
+            "EMPTY", // included for completeness
             "AXE OF HARMING",
             "BATTLE AXE",
             "BLADE OF JUSZTINA",
@@ -168,15 +168,19 @@ namespace MoonoMod
         private static bool HasAllWeapons(CONTROL control)
         {
             string[] weapons = control.CURRENT_PL_DATA.WEPS;
+            HashSet<string> weaponSet = new();
 
-            int weapon_count = -1; // presumably Kira's way of dealing with EMPTY
+            int weapon_count = -1; // presumably Kira's way of dealing with EMPTY. It's terrible, but here I am doing it too.
             int special_weapon_count = 0;
             for (int index = 0; index < weapons.Length && weapons[index] != null && weapons[index] != ""; index += 1)
             {
+                string weaponName = Util.TrimTrailingNumbers(weapons[index]);
+                weaponSet.Add(weaponName);
+
                 // log ALL weapons
-                if (MoonoMod.verboseLogs!.Value)
+                if (MoonoMod.debugInventory?.Value ?? false)
                 {
-                    MoonoMod.Logger!.LogMessage(weapons[index]);
+                    MoonoMod.Logger!.LogMessage($"you have {weapons[index]} = {weaponName}");
                 }
 
                 weapon_count += 1;
@@ -186,12 +190,28 @@ namespace MoonoMod
                 }
             }
 
-            if (MoonoMod.debugLogs!.Value)
+            if (MoonoMod.debugLogs?.Value ?? false)
             {
-                MoonoMod.Logger!.LogInfo($"You have {weapon_count} / {TOTAL_WEAPON_COUNT} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons.");
+                bool anyObsidian = weaponSet.Overlaps(OBSIDIAN_WEAPONS);
+                bool anyShadowShining = weaponSet.Overlaps(SHADOW_SHINING_BLADE);
+                HashSet<string> missingWeapons = new(TERMINAL_WEAPONS);
+                missingWeapons.ExceptWith(weaponSet);
+                MoonoMod.Logger!.LogInfo($"You have {weapon_count} / {TOTAL_WEAPON_COUNT} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons. obsidian={weaponSet.Overlaps(OBSIDIAN_WEAPONS)} shadowShining={anyShadowShining} missing={missingWeapons.Count}");
+                if (MoonoMod.debugInventory?.Value ?? false)
+                {
+                    foreach (string missingWeapon in missingWeapons)
+                    {
+                        MoonoMod.Logger!.LogInfo($"missing {missingWeapon}");
+                    }
+                }
+
+                return anyObsidian && anyShadowShining && missingWeapons.Count == 0;
+            }
+            else
+            {
+                return weaponSet.Overlaps(OBSIDIAN_WEAPONS) && weaponSet.Overlaps(SHADOW_SHINING_BLADE) && weaponSet.IsSupersetOf(TERMINAL_WEAPONS);
             }
 
-            return weapon_count >= TOTAL_WEAPON_COUNT && special_weapon_count >= EXPECTED_SPECIAL_WEAPONS;
         }
 
         [HarmonyPatch]
@@ -207,9 +227,7 @@ namespace MoonoMod
                     return true; // run original method
                 }
 
-                //TODO: give the achievment when I'm good and ready.
-                HasAllWeapons(__instance);
-                //___ACHY?.transform.GetChild(0).gameObject.SetActive(HasAllWeapons(__instance));
+                ___ACHY?.transform.GetChild(0).gameObject.SetActive(HasAllWeapons(__instance));
                 return false; // skip original method
             }
 

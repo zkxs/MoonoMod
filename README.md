@@ -1,8 +1,8 @@
 # MoonoMod
 
 A mod for [Lunacid](https://store.steampowered.com/app/1745510/Lunacid/) that disables certain time checks the game
-performs. **Note that reading further will spoil certain intentionally obscure things the game does.** If you enjoy
-trying to figure out obscure things on your own, you've been warned.
+performs and fixes some related bugs. **Note that reading further will spoil certain intentionally obscure things the
+game does.** If you enjoy trying to figure out obscure things on your own, you've been warned.
 
 I made this mod because I was not very happy to learn that I'd done my first playthrough on a new moon, and had
 therefore completely missed the entire Lunacy mechanic. And to add further insult, it'd be a 15 day wait to get the
@@ -89,7 +89,10 @@ these checks fail, the bug fixes will automatically disable and vanilla behavior
   check when you're still missing spells. Because this mod makes the Jingle Bells spell trivial to obtain, the bug
   becomes a much larger issue than it'd normally be.
 - **Fix All-Weapon Check**: Fixes the check that calculates if you have all weapons. In vanilla, the check breaks if the
-  Shadow/Shining blade has nonzero weapon XP.
+  Shadow/Shining blade has nonzero weapon XP. Also, Kira checks to make sure you have 48 or more weapons... but it's 
+  possible to obtain at least 51 distinct weapons. My best guess its that Kira overlooked the fact that you can have
+  both the Obsidian Cursebrand and the Obsidian Posisonguard, as well as failing to count two certain very secret
+  weapons that require you to obtain the Broken Sword first.
 
 ## License
 

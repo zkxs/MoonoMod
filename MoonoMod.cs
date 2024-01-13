@@ -2,6 +2,9 @@
 // See LICENSE file for full text.
 // Copyright © 2024 Michael Ripley
 
+// Uncomment the following define to enable my debugging features. These include certain things I do not want in the base mod, as they're either logspam, inefficient, or just plain cheating.
+//#define DEBUG
+
 using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
@@ -35,6 +38,7 @@ namespace MoonoMod
         internal static ConfigEntry<bool>? allLoot;
         internal static ConfigEntry<bool>? debugLogs;
         internal static ConfigEntry<bool>? verboseLogs;
+        internal static ConfigEntry<bool>? debugInventory;
 
         private void Awake()
         {
@@ -48,9 +52,13 @@ namespace MoonoMod
                 summer = Config.Bind("General", "Force Summer", false, "Force Summer exclusive objects to appear on level load.");
                 fixAllSpellCheck = Config.Bind("Bugfixes", "Fix All-Spell Check", true, "Fix the all-spell check to not include normally unobtainable spells in your total.");
                 fixAllWeaponCheck = Config.Bind("Bugfixes", "Fix All-Weapon Check", true, "Fix the all-weapon check to not not break if your Shadow/Shining blade has nonzero weapon XP.");
+
+#if DEBUG
                 allLoot = Config.Bind("Cheats", "Drop All Loot", false, "Enemies drop everything in their loot table when killed.");
                 debugLogs = Config.Bind("Developer", "Enable Debug Logs", false, "Emit BepInEx logs when certain time checks are detected. Useful for figuring out which levels contain which checks.");
-                verboseLogs = Config.Bind("Developer", "Enable Verbose Logs", false, "Emit BepInEx logs that help learn the names of all spells and weapons.");
+                verboseLogs = Config.Bind("Developer", "Enable Verbose Logs", false, "Emit BepInEx logs in a higher level of verbosity.");
+                debugInventory = Config.Bind("Developer", "Enable Inventory Debug Logs", false, "Emit BepInEx logs that contain inventory state information.");
+#endif
 
                 if (Application.version != EXPECTED_VERSION)
                 {
@@ -113,7 +121,7 @@ namespace MoonoMod
             [HarmonyPatch(typeof(Season_Con), "OnEnable")]
             private static bool SeasonCon(Season_Con __instance)
             {
-                if (debugLogs!.Value)
+                if (debugLogs?.Value ?? false)
                 {
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a Summer check.");
                 }
@@ -139,7 +147,7 @@ namespace MoonoMod
                 }
                 else
                 {
-                    if (debugLogs!.Value)
+                    if (debugLogs?.Value ?? false)
                     {
                         Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a wait-a-month check.");
                     }
@@ -167,7 +175,7 @@ namespace MoonoMod
                 }
                 else
                 {
-                    if (debugLogs!.Value)
+                    if (debugLogs?.Value ?? false)
                     {
                         Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a {__instance.length} minutes wait check.");
                     }
@@ -187,7 +195,7 @@ namespace MoonoMod
             [HarmonyPatch(typeof(CRIMPUS), "OnEnable")]
             private static bool Christmas(WaitAMonth __instance)
             {
-                if (debugLogs!.Value)
+                if (debugLogs?.Value ?? false)
                 {
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a Christmas check.");
                 }
@@ -268,47 +276,54 @@ namespace MoonoMod
                 }
             }
 
+#if DEBUG
             // log levels that contain full moon exclusive objects
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Spawn_if_moon), "OnEnable")]
             private static void LogMoonCheck(Spawn_if_moon __instance)
             {
-                if (debugLogs!.Value)
+                if (debugLogs?.Value ?? false)
                 {
                     bool passed = __instance.MOON.MOON_MULT > 9.0;
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a full moon check. MOON_MULT = {__instance.MOON.MOON_MULT}. Pass = {passed}.");
                 }
             }
+#endif
 
+#if DEBUG
             // log levels that contain materials or lights affected by MOON_MULT
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Moon_Light), "OnEnable")]
             private static void LogMoonLight(Moon_Light __instance)
             {
-                if (debugLogs!.Value)
+                if (debugLogs?.Value ?? false)
                 {
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains {__instance.Mats.Length} materials and {__instance.Lights.Length} lights affected by MOON_MULT ({__instance.MOON.MOON_MULT}).");
                 }
             }
+#endif
 
+#if DEBUG
             // log levels that enemies with moon-based health scaling
             [HarmonyPrefix]
             [HarmonyPatch(typeof(NPC_Scaling), "Scale_NPC")]
             private static void LogMoonHealth(NPC_Scaling __instance)
             {
-                if (debugLogs!.Value && __instance.Scaling_Type == SCALING_TYPE_MOON)
+                if ((debugLogs?.Value ?? false) && __instance.Scaling_Type == SCALING_TYPE_MOON)
                 {
                     var scale_factor = Mathf.Lerp(1f, __instance.scale_str, __instance.MOON.MOON_MULT / 8f);
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains NPC {__instance.AI.gameObject.name} with health scaled by {scale_factor} to {__instance.AI.health_max} by MOON_MULT ({__instance.MOON.MOON_MULT}).");
                 }
             }
+#endif
 
-            // drop all possible loot from an enemy except just one item from the loot table. THIS IS CHEATING!
+#if DEBUG
+            // drop all possible loot from an enemy (instead of just one item from the loot table). THIS IS CHEATING! I used this to debug the all weapons achievement check, because ain't no way I was gonna get both an Obsidian Cursebrand and an Obsidian Posisonguard naturally.
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Loot_scr), "OnEnable")]
             private static bool AllLoot(Loot_scr __instance)
             {
-                if (!allLoot!.Value)
+                if (!(allLoot?.Value ?? false))
                 {
                     return true; // run original method
                 }
@@ -327,6 +342,7 @@ namespace MoonoMod
 
                 return false; // skip original method
             }
+#endif
 
         }
 
