@@ -338,7 +338,7 @@ namespace MoonoMod
                     {
                         string? name = reward.ITEM?.name ?? "null";
                         double chance = 100d * reward.CHANCE / totalChance;
-                        Logger!.LogInfo($"* {chance,5:0.0}%: {name}");
+                        Logger!.LogInfo($"* {chance,6:0.00}%: {name}");
                     }
                 }
 
