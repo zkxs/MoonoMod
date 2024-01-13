@@ -3,7 +3,7 @@
 // Copyright © 2024 Michael Ripley
 
 // Uncomment the following define to enable my debugging features. These include certain things I do not want in the base mod, as they're either logspam, inefficient, or just plain cheating.
-//#define DEBUG
+#define DEBUG
 
 using System;
 using System.Collections.Generic;
@@ -24,7 +24,7 @@ namespace MoonoMod
         internal const string MOD_NAME = "MoonoMod";
         internal const string VERSION = "1.1.0";
 
-        private readonly static string EXPECTED_VERSION = "1.1.2";
+        private readonly static string EXPECTED_LUNACID_VERSION = "1.1.2";
         private readonly static int SCALING_TYPE_MOON = 1;
 
         internal static new ManualLogSource? Logger;
@@ -39,6 +39,7 @@ namespace MoonoMod
         internal static ConfigEntry<bool>? debugLogs;
         internal static ConfigEntry<bool>? verboseLogs;
         internal static ConfigEntry<bool>? debugInventory;
+        internal static ConfigEntry<bool>? debugLoot;
 
         private void Awake()
         {
@@ -56,13 +57,14 @@ namespace MoonoMod
 #if DEBUG
                 allLoot = Config.Bind("Cheats", "Drop All Loot", false, "Enemies drop everything in their loot table when killed.");
                 debugLogs = Config.Bind("Developer", "Enable Debug Logs", false, "Emit BepInEx logs when certain time checks are detected. Useful for figuring out which levels contain which checks.");
-                verboseLogs = Config.Bind("Developer", "Enable Verbose Logs", false, "Emit BepInEx logs in a higher level of verbosity.");
+                verboseLogs = Config.Bind("Developer", "Enable Verbose Logs", false, "Emit BepInEx logs in a higher level of verbosity."); // currently unused
                 debugInventory = Config.Bind("Developer", "Enable Inventory Debug Logs", false, "Emit BepInEx logs that contain inventory state information.");
+                debugLoot = Config.Bind("Developer", "Enable Loot Debug Logs", false, "Emit BepInEx logs that contain drop table information on enemy kill.");
 #endif
 
-                if (Application.version != EXPECTED_VERSION)
+                if (Application.version != EXPECTED_LUNACID_VERSION)
                 {
-                    Logger.LogWarning($"Lunacid is on version {Application.version}, but {MOD_NAME} was built for Lunacid {EXPECTED_VERSION}. While {MOD_NAME} was designed to be as future-proof as reasonably possible, it may behave in unintended ways as I can't forsee every change Kira might make.");
+                    Logger.LogWarning($"Lunacid is on version {Application.version}, but {MOD_NAME} was built for Lunacid {EXPECTED_LUNACID_VERSION}. While {MOD_NAME} was designed to be as future-proof as reasonably possible, it may behave in unintended ways as I can't forsee every change Kira might make.");
                 }
 
                 Harmony harmony = new Harmony(GUID);
@@ -323,6 +325,23 @@ namespace MoonoMod
             [HarmonyPatch(typeof(Loot_scr), "OnEnable")]
             private static bool AllLoot(Loot_scr __instance)
             {
+                if (debugLoot?.Value ?? false)
+                {
+                    Logger!.LogInfo($"{__instance.gameObject?.name} loot table:");
+                    int totalChance = 0;
+                    foreach (var reward in __instance.LOOTS)
+                    {
+                        totalChance += reward.CHANCE;
+                    }
+
+                    foreach (var reward in __instance.LOOTS)
+                    {
+                        string? name = reward.ITEM?.name ?? "null";
+                        double chance = 100d * reward.CHANCE / totalChance;
+                        Logger!.LogInfo($"* {chance,5:0.0}%: {name}");
+                    }
+                }
+
                 if (!(allLoot?.Value ?? false))
                 {
                     return true; // run original method
