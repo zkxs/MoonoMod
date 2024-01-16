@@ -82,9 +82,6 @@ namespace MoonoMod
                 }
 
                 Harmony harmony = new Harmony(GUID);
-
-                AllWeapons.Init();
-
                 harmony.PatchAll();
 
                 // handle Full Moon toggling

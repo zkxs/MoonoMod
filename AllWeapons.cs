@@ -3,8 +3,6 @@
 // Copyright © 2024 Michael Ripley
 
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
 
@@ -12,25 +10,6 @@ namespace MoonoMod
 {
     internal class AllWeapons
     {
-        // this is the same as the vanilla list, except the circular upgrade weapons "SHINING BLADE" and "SHADOW BLADE" are removed, as they have numbers appended if they have nonzero weapon XP which breaks Kira's check.
-        private readonly static HashSet<string> SPECIAL_WEAPONS = new(new string[]
-        {
-            "JOTUNN SLAYER",
-            "DARK GREATSWORD",
-            "DOUBLE CROSSBOW",
-            "ELFEN LONGSWORD",
-            "FIRE SWORD",
-            "HERITAGE SWORD",
-            "IRON TORCH",
-            "LYRIAN GREATSWORD",
-            "MARAUDER BLACK FLAIL",
-            "POISON CLAW",
-            "SAINT ISHII",
-            "SILVER RAPIER",
-            "STEEL CLUB",
-            "STEEL LANCE",
-        });
-
         // there's 51 distinct weapons you can technically have. Also you can have duplicates... Kira checks for 48. Which 3 didn't they want to count?
         // Kira probably doesn't know about the drop duping bug that would let you have both the CURSEBRAND and the POISONGUARD, so really it's just 50 weapons you can have.
         private readonly static HashSet<string> TERMINAL_WEAPONS = new(new string[] {
@@ -83,12 +62,6 @@ namespace MoonoMod
             "WOODEN SHIELD",
         });
 
-        // My best guess as to the weapons Kira didn't want to count in the 48
-        private readonly static HashSet<string> LOSABLE_WEAPONS = new(new string[] {
-            "DEATH SCYTHE", // numeric suffix. Might be considered secret?. Lost when you restore Death.
-            "HAMMER OF CRUELTY", // Lost if you return it to Garrat.
-        });
-
         // player must have AT LEAST one of these two
         private readonly static HashSet<string> OBSIDIAN_WEAPONS = new(new string[] {
             "OBSIDIAN CURSEBRAND", // numeric suffix
@@ -101,82 +74,15 @@ namespace MoonoMod
             "SHINING BLADE", // numeric suffix
         });
 
-        // if remains on 0 and isn't updated, we'll just not do the relevant patches
-        private static int totalWeaponCount = 0;
-
-        // fun fact: I count 50 obtainable weapons. Maybe 51 if you can get both an Obsidian Cursebrand and Obsidian Poisonguard to drop. So I have no idea where Kira got 48 from.
-        private readonly static int EXPECTED_TOTAL_WEAPONS = 48;
-
-        // this matches kira's expected count of 15 (at least after I solved the "SHINING BLADE"/"SHADOW BLADE" debacle)
-        private readonly static int EXPECTED_SPECIAL_WEAPONS = SPECIAL_WEAPONS.Count;
-
-        internal static void Init()
-        {
-            try
-            {
-                totalWeaponCount = ComputeTotalWeaponCount();
-            }
-            catch (TranspilerException e)
-            {
-                MoonoMod.Logger!.LogWarning($"Disabling total weapon count fix due to error:\n{e}");
-            }
-            if (totalWeaponCount != EXPECTED_TOTAL_WEAPONS)
-            {
-                MoonoMod.Logger!.LogWarning($"Found evidence of {totalWeaponCount} weapons, but expected {EXPECTED_TOTAL_WEAPONS}. Kira may have added new weapons or fixed the weapon count bug this mod fixes.");
-            }
-        }
-
-        // get total weapon count in a dynamic way. This is non-trivial, because the weapons are unloaded in an asset bundle and Unity 2020.3.4f1 has no way to enumerate them.
-        // instead we'll just read how many weapons Kira thinks there are, because they've got a hardcoded count lying around.
-        private static int ComputeTotalWeaponCount()
-        {
-            MethodInfo hasAllWeapons = AccessTools.DeclaredMethod(typeof(CONTROL), nameof(CONTROL.CheckForAllWeps));
-            List<CodeInstruction> codes = PatchProcessor.GetOriginalInstructions(hasAllWeapons);
-
-            // sliding window search for ldc.i4.s, blt.s
-            for (int index = codes.Count - 1; index > 0; index -= 1)
-            {
-                if ((codes[index - 1].opcode == OpCodes.Ldc_I4 || codes[index - 1].opcode == OpCodes.Ldc_I4_S) && (codes[index].opcode == OpCodes.Blt || codes[index].opcode == OpCodes.Blt_S))
-                {
-                    object totalWeaponCount = codes[index - 1].operand;
-
-                    try
-                    {
-                        // handle normal LDC
-                        return (int)totalWeaponCount;
-                    }
-                    catch
-                    {
-                    }
-
-                    try
-                    {
-                        // handle short-form LDC
-                        return (sbyte)totalWeaponCount;
-                    }
-                    catch
-                    {
-                    }
-
-                    throw new TranspilerException($"Could not extract int from {totalWeaponCount.GetType()} when trying to read total weapon count");
-                }
-            }
-
-            throw new TranspilerException("Could not read total weapon count");
-        }
-
         private static bool ShouldPatchWeaponCount()
         {
-            return MoonoMod.fixAllWeaponCheck!.Value && totalWeaponCount != 0;
+            return MoonoMod.fixAllWeaponCheck!.Value;
         }
 
         private static bool HasAllWeapons(CONTROL control)
         {
             string[] weapons = control.CURRENT_PL_DATA.WEPS;
             HashSet<string> weaponSet = new();
-
-            int weapon_count = -1; // presumably Kira's way of dealing with EMPTY. It's terrible, but here I am doing it too.
-            int special_weapon_count = 0;
             for (int index = 0; index < weapons.Length && weapons[index] != null && weapons[index] != ""; index += 1)
             {
                 string weaponName = Util.TrimTrailingNumbers(weapons[index]);
@@ -187,30 +93,20 @@ namespace MoonoMod
                 {
                     MoonoMod.Logger!.LogMessage($"you have {weapons[index]} = {weaponName}");
                 }
-
-                weapon_count += 1;
-                if (SPECIAL_WEAPONS.Contains(weapons[index]))
-                {
-                    special_weapon_count += 1;
-                }
             }
 
-            if (MoonoMod.debugLogs?.Value ?? false)
+            if (MoonoMod.debugInventory?.Value ?? false)
             {
                 bool anyObsidian = weaponSet.Overlaps(OBSIDIAN_WEAPONS);
                 bool anyShadowShining = weaponSet.Overlaps(SHADOW_SHINING_BLADE);
                 HashSet<string> missingWeapons = new(TERMINAL_WEAPONS);
                 missingWeapons.ExceptWith(weaponSet);
-                MoonoMod.Logger!.LogInfo($"You have {weapon_count} / {totalWeaponCount} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons. obsidian={weaponSet.Overlaps(OBSIDIAN_WEAPONS)} shadowShining={anyShadowShining} missing={missingWeapons.Count}");
-                if (MoonoMod.debugInventory?.Value ?? false)
+                foreach (string missingWeapon in missingWeapons)
                 {
-                    foreach (string missingWeapon in missingWeapons)
-                    {
-                        MoonoMod.Logger!.LogInfo($"missing {missingWeapon}");
-                    }
+                    MoonoMod.Logger!.LogInfo($"missing {missingWeapon}");
                 }
 
-                return anyObsidian && anyShadowShining && missingWeapons.Count == 0;
+                return anyObsidian && anyShadowShining && (missingWeapons.Count == 0);
             }
             else
             {
