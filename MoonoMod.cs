@@ -7,12 +7,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Reflection.Emit;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
-using HarmonyLib.Tools;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -24,6 +24,8 @@ namespace MoonoMod
         internal const string GUID = "dev.zkxs.moonomod";
         internal const string MOD_NAME = "MoonoMod";
         internal const string MOD_VERSION = "1.2.0";
+
+        private readonly static object[] EMPTY_ARRAY = { };
 
         private readonly static string EXPECTED_LUNACID_VERSION = "1.1.2";
 
@@ -86,9 +88,75 @@ namespace MoonoMod
 
                 harmony.PatchAll();
 
-                disableVsync.SettingChanged += (sender, args) => Logger.LogInfo("woah");
+                // handle Full Moon toggling
+                {
+                    MethodInfo simpleMoonStart = AccessTools.DeclaredMethod(typeof(SimpleMoon), "Start");
+                    MethodInfo spawnIfMoonEnable = AccessTools.DeclaredMethod(typeof(Spawn_if_moon), "OnEnable");
+                    MethodInfo moonLightEnable = AccessTools.DeclaredMethod(typeof(Moon_Light), "OnEnable");
+                    fullMoon.SettingChanged += (sender, args) =>
+                    {
+                        // this one is going to be a little complicated, as it has to touch a number of moving parts
 
-                Logger.LogInfo("You're about to hack time, are you sure?"); // kung fury quote
+                        // first, refresh all the SimpleMoon objects. The vanilla implementation can handle being called again like this.
+                        foreach (SimpleMoon simpleMoon in FindObjectsOfType<SimpleMoon>())
+                        {
+                            simpleMoonStart.Invoke(simpleMoon, EMPTY_ARRAY);
+                        }
+
+                        // next, refresh all the Spawn_if_moon objects.
+                        foreach (Spawn_if_moon spawnIfMoon in FindObjectsOfType<Spawn_if_moon>())
+                        {
+                            spawnIfMoonEnable.Invoke(spawnIfMoon, EMPTY_ARRAY);
+                        }
+
+                        // next, rescale NPCS with moon-based scaling
+                        foreach (NPC_Scaling npcScaling in FindObjectsOfType<NPC_Scaling>())
+                        {
+                            if (npcScaling.Scaling_Type == SCALING_TYPE_MOON)
+                            {
+                                NpcScalingDetails.Rescale(npcScaling);
+                            }
+                        }
+
+                        // next, update lights and materials. The vanilla implementation can handle OnEnable() being called again.
+                        foreach (Moon_Light moonLight in FindObjectsOfType<Moon_Light>())
+                        {
+                            moonLightEnable.Invoke(moonLight, EMPTY_ARRAY);
+                        }
+                    };
+                }
+
+                //TODO: handle skipWaits toggling
+
+                // handle Christmas patch toggling
+                {
+                    MethodInfo crimpusEnable = AccessTools.DeclaredMethod(typeof(CRIMPUS), "OnEnable");
+                    christmas.SettingChanged += (sender, args) =>
+                    {
+                        foreach (CRIMPUS crimpus in FindObjectsOfType<CRIMPUS>())
+                        {
+                            crimpusEnable.Invoke(crimpus, EMPTY_ARRAY);
+                        }
+                    };
+                }
+
+                // handle Summer patch toggling
+                {
+                    MethodInfo seasonConEnable = AccessTools.DeclaredMethod(typeof(Season_Con), "OnEnable");
+                    summer.SettingChanged += (sender, args) =>
+                    {
+                        foreach (Season_Con seasonCon in FindObjectsOfType<Season_Con>())
+                        {
+                            seasonConEnable.Invoke(seasonCon, EMPTY_ARRAY);
+                        }
+                    };
+                }
+
+                // handle vsync patch toggling
+                disableVsync.SettingChanged += (sender, args) => FindObjectOfType<CONTROL>()?.SetFPS();
+
+                // Nothing broke. Emit a log to indicate this.
+                Logger.LogInfo($"{MOD_NAME} successfully set up all patches!");
             }
             catch (Exception e)
             {
@@ -143,7 +211,7 @@ namespace MoonoMod
                 if (codes[index].Calls(nowMethod))
                 {
                     // replace with a call to our faked DateTime.Now()
-                    codes[index] = new CodeInstruction(OpCodes.Call, fakeMethod);
+                    codes[index].operand = fakeMethod;
                     replacedAny = true;
                 }
             }
@@ -172,12 +240,14 @@ namespace MoonoMod
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a Summer check.");
                 }
 
+                bool active = true;
                 if (!summer!.Value)
                 {
-                    return true; // run original method
+                    // check is written this way to only call DateTime.Now if the patch is disabled
+                    int month = DateTime.Now.Month;
+                    active = month > 2 && month < 9;
                 }
-
-                __instance.transform.GetChild(0).gameObject.SetActive(true);
+                __instance.transform.GetChild(0).gameObject.SetActive(active);
                 return false; // skip original method
             }
 
@@ -239,19 +309,22 @@ namespace MoonoMod
             // Always enable objects that are Christmas-exclusive. This is mostly decorations, but also the Christmas spell.
             [HarmonyPrefix]
             [HarmonyPatch(typeof(CRIMPUS), "OnEnable")]
-            private static bool Christmas(WaitAMonth __instance)
+            private static bool Christmas(WaitAMonth __instance, bool ___EXACT)
             {
                 if (debugLogs?.Value ?? false)
                 {
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a Christmas check.");
                 }
 
+                bool active = true;
                 if (!christmas!.Value)
                 {
-                    return true; // run original method
+                    // check is written this way to only call DateTime.Now if the patch is disabled
+                    DateTime now = DateTime.Now;
+                    active = now.Month == 12 && now.Day >= (___EXACT ? 25 : 10);
                 }
 
-                __instance.transform.GetChild(0).gameObject.SetActive(true);
+                __instance.transform.GetChild(0).gameObject.SetActive(active);
                 return false; // skip original method
             }
 
@@ -274,7 +347,7 @@ namespace MoonoMod
                         if (codes[index].Calls(nowMethod))
                         {
                             // replace with a call to our faked DateTime.Now()
-                            codes[index] = new CodeInstruction(OpCodes.Call, fakeMethod);
+                            codes[index].operand = fakeMethod;
                             return codes;
                         }
                     }
@@ -304,33 +377,7 @@ namespace MoonoMod
             [HarmonyPatch(typeof(Moon_scr), "Start")]
             private static IEnumerable<CodeInstruction> MoonScr(IEnumerable<CodeInstruction> instructions)
             {
-                var codes = new List<CodeInstruction>(instructions);
-                var nowMethod = AccessTools.DeclaredPropertyGetter(typeof(DateTime), nameof(DateTime.Now));
-                var fakeMethod = AccessTools.DeclaredMethod(typeof(MoonoMod), nameof(FullMoonDate));
-
-                bool replacedAny = false;
-                for (int index = 0; index < codes.Count; index += 1)
-                {
-                    
-
-                    if (codes[index].Calls(nowMethod))
-                    {
-                        string original = $"{codes[index]}";
-                        // replace with a call to our faked DateTime.Now()
-                        codes[index] = new CodeInstruction(OpCodes.Call, fakeMethod);
-                        replacedAny = true;
-
-                        Logger!.LogInfo($"{index} REPLACED {original} WITH {codes[index]}");
-                    }
-                    else
-                    {
-                        Logger!.LogInfo($"{index} {codes[index]}");
-                    }
-                }
-
-                Logger!.LogInfo($"replacedAny={replacedAny}");
-
-                return codes;
+                return FullMoonTranspiler(instructions);
             }
 
             // Always enable objects that are Christmas-exclusive. This is mostly decorations, but also the Christmas spell.
@@ -354,19 +401,44 @@ namespace MoonoMod
                 }
             }
 
-#if DEBUG
-            // log levels that contain full moon exclusive objects
+            // Patch Spawn_if_moon to allow disabling the objects if OnEnable is ran again
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Spawn_if_moon), "OnEnable")]
-            private static void LogMoonCheck(Spawn_if_moon __instance)
+            private static bool LogMoonCheck(Spawn_if_moon __instance, GameObject[] ___TARGETS)
             {
+                bool active = __instance.MOON.MOON_MULT > 9.0;
                 if (debugLogs?.Value ?? false)
                 {
-                    bool passed = __instance.MOON.MOON_MULT > 9.0;
-                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a full moon check. MOON_MULT = {__instance.MOON.MOON_MULT}. Pass = {passed}.");
+                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a full moon check. MOON_MULT = {__instance.MOON.MOON_MULT}. Pass = {active}.");
+                }
+
+                foreach (GameObject gameObject in ___TARGETS)
+                {
+                    gameObject.SetActive(active);
+                }
+
+                return false; // skip original method
+            }
+
+            // handle NPC rescaling
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(NPC_Scaling), "Scale_NPC")]
+            private static bool ScaleNpc(NPC_Scaling __instance)
+            {
+                if (__instance.Scaling_Type == SCALING_TYPE_MOON)
+                {
+                    NpcScalingDetails.Rescale(__instance);
+
+                    return false; // skip original method
+                }
+                else
+                {
+                    // we don't rescale non-moon NPCs. This includes NPCs that scale from player level, and NPCS that scale from Abyss Tower floor.
+                    return true; // run original method
                 }
             }
 
+#if DEBUG
             // log levels that contain materials or lights affected by MOON_MULT
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Moon_Light), "OnEnable")]
@@ -375,18 +447,6 @@ namespace MoonoMod
                 if (debugLogs?.Value ?? false)
                 {
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains {__instance.Mats.Length} materials and {__instance.Lights.Length} lights affected by MOON_MULT ({__instance.MOON.MOON_MULT}).");
-                }
-            }
-
-            // log levels that enemies with moon-based health scaling
-            [HarmonyPrefix]
-            [HarmonyPatch(typeof(NPC_Scaling), "Scale_NPC")]
-            private static void LogMoonHealth(NPC_Scaling __instance)
-            {
-                if ((debugLogs?.Value ?? false) && __instance.Scaling_Type == SCALING_TYPE_MOON)
-                {
-                    var scale_factor = Mathf.Lerp(1f, __instance.scale_str, __instance.MOON.MOON_MULT / 8f);
-                    Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains NPC {__instance.AI.gameObject.name} with health scaled by {scale_factor} to {__instance.AI.health_max} by MOON_MULT ({__instance.MOON.MOON_MULT}).");
                 }
             }
 
