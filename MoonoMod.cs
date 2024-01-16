@@ -22,7 +22,7 @@ namespace MoonoMod
     {
         internal const string GUID = "dev.zkxs.moonomod";
         internal const string MOD_NAME = "MoonoMod";
-        internal const string MOD_VERSION = "1.1.1";
+        internal const string MOD_VERSION = "1.2.0";
 
         private readonly static string EXPECTED_LUNACID_VERSION = "1.1.2";
         private readonly static int SCALING_TYPE_MOON = 1;
