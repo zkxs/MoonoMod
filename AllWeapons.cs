@@ -102,7 +102,7 @@ namespace MoonoMod
         });
 
         // if remains on 0 and isn't updated, we'll just not do the relevant patches
-        private static int TOTAL_WEAPON_COUNT = 0;
+        private static int totalWeaponCount = 0;
 
         // fun fact: I count 50 obtainable weapons. Maybe 51 if you can get both an Obsidian Cursebrand and Obsidian Poisonguard to drop. So I have no idea where Kira got 48 from.
         private readonly static int EXPECTED_TOTAL_WEAPONS = 48;
@@ -114,15 +114,15 @@ namespace MoonoMod
         {
             try
             {
-                TOTAL_WEAPON_COUNT = ComputeTotalWeaponCount();
+                totalWeaponCount = ComputeTotalWeaponCount();
             }
             catch (TranspilerException e)
             {
                 MoonoMod.Logger!.LogWarning($"Disabling total weapon count fix due to error:\n{e}");
             }
-            if (TOTAL_WEAPON_COUNT != EXPECTED_TOTAL_WEAPONS)
+            if (totalWeaponCount != EXPECTED_TOTAL_WEAPONS)
             {
-                MoonoMod.Logger!.LogWarning($"Found evidence of {TOTAL_WEAPON_COUNT} weapons, but expected {EXPECTED_TOTAL_WEAPONS}. Kira may have added new weapons or fixed the weapon count bug this mod fixes.");
+                MoonoMod.Logger!.LogWarning($"Found evidence of {totalWeaponCount} weapons, but expected {EXPECTED_TOTAL_WEAPONS}. Kira may have added new weapons or fixed the weapon count bug this mod fixes.");
             }
         }
 
@@ -167,7 +167,7 @@ namespace MoonoMod
 
         private static bool ShouldPatchWeaponCount()
         {
-            return MoonoMod.fixAllWeaponCheck!.Value && TOTAL_WEAPON_COUNT != 0;
+            return MoonoMod.fixAllWeaponCheck!.Value && totalWeaponCount != 0;
         }
 
         private static bool HasAllWeapons(CONTROL control)
@@ -201,7 +201,7 @@ namespace MoonoMod
                 bool anyShadowShining = weaponSet.Overlaps(SHADOW_SHINING_BLADE);
                 HashSet<string> missingWeapons = new(TERMINAL_WEAPONS);
                 missingWeapons.ExceptWith(weaponSet);
-                MoonoMod.Logger!.LogInfo($"You have {weapon_count} / {TOTAL_WEAPON_COUNT} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons. obsidian={weaponSet.Overlaps(OBSIDIAN_WEAPONS)} shadowShining={anyShadowShining} missing={missingWeapons.Count}");
+                MoonoMod.Logger!.LogInfo($"You have {weapon_count} / {totalWeaponCount} weapons, and {special_weapon_count} / {EXPECTED_SPECIAL_WEAPONS} special weapons. obsidian={weaponSet.Overlaps(OBSIDIAN_WEAPONS)} shadowShining={anyShadowShining} missing={missingWeapons.Count}");
                 if (MoonoMod.debugInventory?.Value ?? false)
                 {
                     foreach (string missingWeapon in missingWeapons)

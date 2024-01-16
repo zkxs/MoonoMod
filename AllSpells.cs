@@ -68,7 +68,7 @@ namespace MoonoMod
         });
 
         // if remains on 0 and isn't updated, we'll just not do the relevant patches
-        private static int TOTAL_SPELL_COUNT = 0;
+        private static int totalSpellCount = 0;
 
         // how many spells Kira thinks are in the game, as of Lunacid 1.1.2
         private readonly static int EXPECTED_TOTAL_SPELL_COUNT = 36;
@@ -77,15 +77,15 @@ namespace MoonoMod
         {
             try
             {
-                TOTAL_SPELL_COUNT = ComputeTotalSpellCount();
+                totalSpellCount = ComputeTotalSpellCount();
             }
             catch (TranspilerException e)
             {
                 MoonoMod.Logger!.LogWarning($"Disabling total spell count fix due to error:\n{e}");
             }
-            if (TOTAL_SPELL_COUNT != EXPECTED_TOTAL_SPELL_COUNT)
+            if (totalSpellCount != EXPECTED_TOTAL_SPELL_COUNT)
             {
-                MoonoMod.Logger!.LogWarning($"Found evidence of {TOTAL_SPELL_COUNT} spells, but expected {EXPECTED_TOTAL_SPELL_COUNT}. Kira may have added new spells or fixed the spell count bug this mod fixes.");
+                MoonoMod.Logger!.LogWarning($"Found evidence of {totalSpellCount} spells, but expected {EXPECTED_TOTAL_SPELL_COUNT}. Kira may have added new spells or fixed the spell count bug this mod fixes.");
             }
         }
 
@@ -130,7 +130,7 @@ namespace MoonoMod
 
         private static bool ShouldPatchSpellCount()
         {
-            return MoonoMod.fixAllSpellCheck!.Value && TOTAL_SPELL_COUNT != 0;
+            return MoonoMod.fixAllSpellCheck!.Value && totalSpellCount != 0;
         }
 
         private static bool HasAllSpells(CONTROL control)
@@ -158,7 +158,7 @@ namespace MoonoMod
             {
                 HashSet<string> missingSpells = new(ALL_SPELLS);
                 missingSpells.ExceptWith(spellSet);
-                MoonoMod.Logger!.LogInfo($"You have {spell_count} / {TOTAL_SPELL_COUNT} spells");
+                MoonoMod.Logger!.LogInfo($"You have {spell_count} / {totalSpellCount} spells");
 
                 if (MoonoMod.debugInventory?.Value ?? false)
                 {

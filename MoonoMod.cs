@@ -25,6 +25,8 @@ namespace MoonoMod
         internal const string MOD_VERSION = "1.2.0";
 
         private readonly static string EXPECTED_LUNACID_VERSION = "1.1.2";
+
+        // the scaling type value that means an NPC scales based on MOON_MULT
         private readonly static int SCALING_TYPE_MOON = 1;
 
         internal static new ManualLogSource? Logger;
