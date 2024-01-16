@@ -83,7 +83,6 @@ namespace MoonoMod
 
                 Harmony harmony = new Harmony(GUID);
 
-                AllSpells.Init();
                 AllWeapons.Init();
 
                 harmony.PatchAll();
