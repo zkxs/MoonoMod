@@ -126,7 +126,22 @@ namespace MoonoMod
                     };
                 }
 
-                //TODO: handle skipWaits toggling
+                // handle skipWaits toggling
+                {
+                    skipWaits.SettingChanged += (sender, args) =>
+                    {
+                        MethodInfo waitAMonthStart = AccessTools.DeclaredMethod(typeof(WaitAMonth), "Start");
+                        MethodInfo realTimerEnable = AccessTools.DeclaredMethod(typeof(Real_Timer), "OnEnable");
+                        foreach (WaitAMonth waitAMonth in FindObjectsOfType<WaitAMonth>())
+                        {
+                            waitAMonthStart.Invoke(waitAMonth, EMPTY_ARRAY);
+                        }
+                        foreach (Real_Timer realTimer in FindObjectsOfType<Real_Timer>())
+                        {
+                            realTimerEnable.Invoke(realTimer, EMPTY_ARRAY);
+                        }
+                    };
+                }
 
                 // handle Christmas patch toggling
                 {
@@ -197,6 +212,16 @@ namespace MoonoMod
             }
         }
 
+        // convert a dateTime into Kira Minutes.
+        // Yes, I am aware that there are 24*60==1440 minutes in a day. But Kira apparently thinks that there are only 10 hours in a day.
+        // I have to keep this behavior for compatibility with Vanilla.
+        private static int KiraMinutes(DateTime dateTime)
+        {
+            const int KIRA_MINUTES_PER_DAY = 600;
+            const int MINUTES_PER_HOUR = 60;
+            return dateTime.DayOfYear * KIRA_MINUTES_PER_DAY + dateTime.Minute + dateTime.Hour * MINUTES_PER_HOUR;
+        }
+
         // used to hijacking all DateTime.Now calls the transpiled method makes and replace the date with that of a full moon
         private static IEnumerable<CodeInstruction> FullMoonTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -259,7 +284,19 @@ namespace MoonoMod
             {
                 if (__instance.Setter)
                 {
-                    return true; // run original method it it's a Setter call, because why not?
+                    if (debugLogs?.Value ?? false)
+                    {
+                        Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a wait-a-month set.");
+                    }
+
+                    if (PlayerPrefs.HasKey("EGG"))
+                    {
+                        return false; // this real timer was already set up. Do nothing and skip original method.
+                    }
+                    else
+                    {
+                        return true; // run original method to handle setter
+                    }
                 }
                 else
                 {
@@ -268,13 +305,16 @@ namespace MoonoMod
                         Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a wait-a-month check.");
                     }
 
+                    bool active = true;
                     if (!skipWaits!.Value)
                     {
-                        return true; // run original method
+                        DateTime now = DateTime.Now;
+                        int currentMonth = (now.Year - 2000) * 12 + now.Month; // kira probably shouldn't be summing a 1-indexed month like this, but whatever
+                        int targetMonth = PlayerPrefs.GetInt("EGG", 9999);
+                        active = currentMonth > targetMonth;
                     }
 
-                    // if it's a Getter call just skip the check and run the SetActive code.
-                    __instance.transform.GetChild(0).gameObject.SetActive(true);
+                    __instance.transform.GetChild(0).gameObject.SetActive(active);
                     return false; // skip original method
                 }
             }
@@ -287,21 +327,68 @@ namespace MoonoMod
             {
                 if (__instance.Begin)
                 {
-                    return true; // run original method it it's a Begin call, because why not?
+                    if (debugLogs?.Value ?? false)
+                    {
+                        Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a {__instance.length} minutes wait start named {__instance.label}");
+                    }
+
+                    if (PlayerPrefs.HasKey(__instance.label))
+                    {
+                        return false; // this real timer was already set up. Do nothing and skip original method.
+                    }
+                    else
+                    {
+                        long targetTime = DateTime.UtcNow.Ticks + TimeSpan.TicksPerMinute * __instance.length;
+                        int targetTimeHigh = (int)((targetTime >> 32) & 0xFFFFFFFFL); // discard low bits
+                        int targetTimeLow = (int)(targetTime & 0xFFFFFFFFL); // discard high bits
+                        int saveSlot = PlayerPrefs.GetInt("CURRENT_SAVE", 0);
+                        PlayerPrefs.SetInt($"{__instance.label}_MOONOMOD_SAVE{saveSlot}_HI", targetTimeHigh);
+                        PlayerPrefs.SetInt($"{__instance.label}_MOONOMOD_SAVE{saveSlot}_LO", targetTimeLow);
+                        return true; // run original method it it's a Begin call so that Kira can do their fucked up 10 hour day math. This is needed for vanilla compatibility.
+                    }
                 }
                 else
                 {
                     if (debugLogs?.Value ?? false)
                     {
-                        Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a {__instance.length} minutes wait check.");
+                        Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a {__instance.length} minutes wait check named {__instance.label}");
                     }
 
+                    // check is written this way to only run all the extra logic if we're not skipping the check completely
+                    bool active = true;
                     if (!skipWaits!.Value)
                     {
-                        return true; // run original method
+                        int saveSlot = PlayerPrefs.GetInt("CURRENT_SAVE", 0);
+                        if (PlayerPrefs.HasKey($"{__instance.label}_MOONOMOD_SAVE{saveSlot}_HI"))
+                        {
+                            // our modded timer values exist, so use them and ignore the Kira values
+                            long targetTimeHigh = (PlayerPrefs.GetInt($"{__instance.label}_MOONOMOD_SAVE{saveSlot}_HI") & 0xFFFFFFFL) << 32;
+                            long targetTimeLow = PlayerPrefs.GetInt($"{__instance.label}_MOONOMOD_SAVE{saveSlot}_LO") & 0xFFFFFFFL;
+                            long targetTime = targetTimeHigh & targetTimeLow;
+                            long currentTime = DateTime.UtcNow.Ticks;
+                            active = currentTime >= targetTime;
+                        }
+                        else
+                        {
+                            // only the vanilla timer values exist so we really have zero idea what the real target time is. We'll just do the bugged Kira math.
+                            DateTime now = DateTime.Now;
+                            int currentMinute = KiraMinutes(now);
+                            int targetMinute = PlayerPrefs.GetInt(__instance.label, 0);
+                            if (currentMinute <= targetMinute)
+                            {
+                                // 10-hour day bungle aside, this is SEEMINGLY correct. If minutes of year is less than the target, we need to break ties by year
+                                // of course the next problem is that the target year isn't set correctly. It's the year the timer started, not the year the timer ended.
+                                int targetYear = PlayerPrefs.GetInt(__instance.label + "_Y", 0);
+                                if (targetYear >= now.Year)
+                                {
+                                    // if it's the same year the timer started OR if it's PRIOR to the year the timer started, then don't activate the object
+                                    active = false;
+                                }
+                            }
+                        }
                     }
 
-                    __instance.ACT?.SetActive(true);
+                    __instance.ACT?.SetActive(active);
                     return false; // skip original method
                 }
             }
@@ -309,7 +396,7 @@ namespace MoonoMod
             // Always enable objects that are Christmas-exclusive. This is mostly decorations, but also the Christmas spell.
             [HarmonyPrefix]
             [HarmonyPatch(typeof(CRIMPUS), "OnEnable")]
-            private static bool Christmas(WaitAMonth __instance, bool ___EXACT)
+            private static bool Christmas(CRIMPUS __instance, bool ___EXACT)
             {
                 if (debugLogs?.Value ?? false)
                 {
