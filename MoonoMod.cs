@@ -12,6 +12,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using HarmonyLib.Tools;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -303,7 +304,33 @@ namespace MoonoMod
             [HarmonyPatch(typeof(Moon_scr), "Start")]
             private static IEnumerable<CodeInstruction> MoonScr(IEnumerable<CodeInstruction> instructions)
             {
-                return FullMoonTranspiler(instructions);
+                var codes = new List<CodeInstruction>(instructions);
+                var nowMethod = AccessTools.DeclaredPropertyGetter(typeof(DateTime), nameof(DateTime.Now));
+                var fakeMethod = AccessTools.DeclaredMethod(typeof(MoonoMod), nameof(FullMoonDate));
+
+                bool replacedAny = false;
+                for (int index = 0; index < codes.Count; index += 1)
+                {
+                    
+
+                    if (codes[index].Calls(nowMethod))
+                    {
+                        string original = $"{codes[index]}";
+                        // replace with a call to our faked DateTime.Now()
+                        codes[index] = new CodeInstruction(OpCodes.Call, fakeMethod);
+                        replacedAny = true;
+
+                        Logger!.LogInfo($"{index} REPLACED {original} WITH {codes[index]}");
+                    }
+                    else
+                    {
+                        Logger!.LogInfo($"{index} {codes[index]}");
+                    }
+                }
+
+                Logger!.LogInfo($"replacedAny={replacedAny}");
+
+                return codes;
             }
 
             // Always enable objects that are Christmas-exclusive. This is mostly decorations, but also the Christmas spell.
