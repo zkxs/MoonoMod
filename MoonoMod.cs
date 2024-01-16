@@ -60,15 +60,19 @@ namespace MoonoMod
             {
                 Logger = base.Logger; // this lets us access the logger from static contexts later: namely our patches.
 
-                fullMoon = Config.Bind("General", "Force Full Moon", true, "Force full moon exclusive objects to appear on level load, and maximize the moon multiplier.");
+                // features
+                fullMoon = Config.Bind("General", "Force Full Moon", false, "Force full moon exclusive objects to appear and maximize the moon multiplier.");
                 skipWaits = Config.Bind("General", "Skip Waits", false, "Force all checks to see if the player has waited some duration of time (sometimes minutes, somtimes months) to pass.");
-                christmas = Config.Bind("General", "Force Christmas", false, "Force Christmas exclusive objects to appear on level load, and allow the Jingle Bells spell to be cast.");
-                summer = Config.Bind("General", "Force Summer", false, "Force Summer exclusive objects to appear on level load.");
-                disableVsync = Config.Bind("General", "Disable VSync with high FPS", false, "Forcibly disables VSync when using the high FPS option. Designed for adapative refresh rate monitors.");
-                fixAllSpellCheck = Config.Bind("Bugfixes", "Fix All-Spell Check", true, "Fix the all-spell check to not include normally unobtainable spells in your total.");
-                fixAllWeaponCheck = Config.Bind("Bugfixes", "Fix All-Weapon Check", true, "Fix the all-weapon check to not not break if your Shadow/Shining blade has nonzero weapon XP.");
+                christmas = Config.Bind("General", "Force Christmas", false, "Force Christmas exclusive objects to appear and function correctly.");
+                summer = Config.Bind("General", "Force Summer", false, "Force Summer exclusive objects to appear.");
+                disableVsync = Config.Bind("General", "Disable VSync with High FPS", false, "Forcibly disables VSync when the FPS limit is set to \"OFF\". Designed for adapative refresh rate monitors.");
+
+                // bugfixes
+                fixAllSpellCheck = Config.Bind("Bugfixes", "Fix All-Spell Check", true, "Fix the all-spell check to correctly count all spells.");
+                fixAllWeaponCheck = Config.Bind("Bugfixes", "Fix All-Weapon Check", true, "Fix the all-weapon check to correctly count all weapons.");
 
 #if DEBUG
+                // debug
                 allLoot = Config.Bind("Cheats", "Drop All Loot", false, "Enemies drop everything in their loot table when killed.");
                 debugLogs = Config.Bind("Developer", "Enable Debug Logs", false, "Emit BepInEx logs when certain time checks are detected. Useful for figuring out which levels contain which checks.");
                 verboseLogs = Config.Bind("Developer", "Enable Verbose Logs", false, "Emit BepInEx logs in a higher level of verbosity."); // currently unused

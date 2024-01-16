@@ -1,12 +1,19 @@
 # MoonoMod
 
-A mod for [Lunacid](https://store.steampowered.com/app/1745510/Lunacid/) that disables certain time checks the game
-performs and fixes some related bugs. **Note that reading further will spoil certain intentionally obscure things the
-game does.** If you enjoy trying to figure out obscure things on your own, you've been warned.
+A quality-of-life mod for [Lunacid](https://store.steampowered.com/app/1745510/Lunacid/) that lets you control certain
+time checks and fixes some bugs. If you're trying to 100% the game and find yourself frustrated by artifical waiting
+mechanics, this mod is for you.
 
+This mod can be used without spoiling the game. This readme contains some collapsed spoiler content that you can click on for more details, if you dare.
+
+<p>
+<details>
+<summary><b>SPOILER:</b> Why I made this mod</summary>
 I made this mod because I was not very happy to learn that I'd done my first playthrough on a new moon, and had
 therefore completely missed the entire Lunacy mechanic. And to add further insult, it'd be a 15 day wait to get the
 Broken Sword. I'm aware I could just change my system clock, but I despise setting my system clock incorrectly.
+</details>
+</p>
 
 The name of this project is a riff on [MonoMod](https://github.com/MonoMod/MonoMod).
 
@@ -29,32 +36,69 @@ install).
 Each of the following features can be toggled on and off via configuration options, which can be edited in-game using
 [BepInEx.ConfigurationManager](https://github.com/BepInEx/BepInEx.ConfigurationManager).
 
-By default, only the **Force Full Moon** feature is enabled.
+By default none of these features are enabled.
 
-- **Force Full Moon**: Force full moon exclusive objects to appear on level load, and maximize the moon multiplier.
-  - The moon sprite in the main menu scene will be full.
-  - Objects that only appear during full moon will appear.
-    - The Broken Sword appears.
-    - Clive gets a transparent crown.
-    - Ankou spawn.
-    - Lunaga are replaced with Ga-Mangetsu.
-  - Double player XP gain compared to new moon.
-  - Maximum lunacy gain multiplier. You gain zero lunacy during a new moon.
-  - Cursed Blade does maximum damage, but drains 1 player XP per attack.
-  - Certain lights are recolored. Notably the Fetid Mire skylights are green, but during full moons they're purple.
-  - Certain enemies that have moon-based health scaling will have their maximum health.
-- **Skip Waits**: Force all checks to see if the player has waited some duration of time (sometimes minutes, somtimes
-  months) to pass.
-  - After it's been placed, the skeleton egg normally waits for the month to change before it hatches.
-  - Some NPCs, such as Daedalus, will tell you to come back in a while before their dialogue changes.
-- **Force Christmas**: Force Christmas exclusive objects to appear on level load, and allow the Jingle Bells spell to be
-  cast.
-  - Jingle Bells can normally only be cast during December.
-  - The christmas present (Jingle Bells) normally only appears December 25-31.
-  - Christmas decorations normally only appear December 10-31.
-- **Force Summer**: Force Summer exclusive objects to appear on level load.
-  - As far as I can tell, this only makes Patchouli's horns have flowers. This naturally happens during the months of
-    March-August.
+### **Force Full Moon**
+
+Force full moon exclusive objects to appear on level load, and maximize the moon multiplier.
+
+<details>
+<summary><b>SPOILER:</b> additional details</summary>
+
+- The moon sprite in the main menu scene will be full.
+- Objects that only appear during full moon will appear.
+  - The Broken Sword appears.
+  - Clive gets a transparent crown.
+  - Ankou spawn.
+  - Lunaga are replaced with Ga-Mangetsu.
+- Double player XP gain compared to new moon.
+- Maximum lunacy gain multiplier. You gain zero lunacy during a new moon.
+- Cursed Blade does maximum damage, but drains 1 player XP per attack.
+- Certain lights are recolored. Notably the Fetid Mire skylights are green, but during full moons they're purple.
+- Certain enemies have moon-based health scaling. For example, Abyssal Demons scale down to half health when the moon
+  is full.
+
+</details>
+
+### Skip Waits
+
+Force all checks to see if the player has waited some duration of time (sometimes minutes, somtimes months) to pass.
+
+<details>
+<summary><b>SPOILER:</b> additional details</summary>
+
+- After it's been placed, the skeleton egg normally waits for the month to change before it hatches.
+- Some NPCs, such as Daedalus, will tell you to come back in a while before their dialogue changes.
+
+</details>
+
+### Force Christmas
+
+Enable Christmas-exclusive content.
+
+<details>
+<summary><b>SPOILER:</b> additional details</summary>
+
+- Christmas decorations normally only appear December 10-31.
+- The christmas present (Jingle Bells) normally only appears December 25-31.
+- Jingle Bells can normally only be cast during December.
+
+</details>
+
+### Force Summer
+
+Enable Summer-exclusive content.
+
+<details>
+<summary><b>SPOILER:</b> additional details</summary>
+As far as I can tell, this only makes Patchouli's horns have flowers. This naturally happens during the months of
+March-August.
+</details>
+
+### Disable VSync with High FPS
+
+Forcibly disables VSync when the FPS limit is set to "OFF" and sets the FPS limit to 5 FPS under your monitor's refresh
+rate. This is optimal for adapative refresh rate monitors (G-Sync, FreeSync, etc).
 
 <!--
 
@@ -82,19 +126,42 @@ During the making of this mod I found a number of Lunacid bugs.
 
 ## Bug Fixes
 
-All bug fixes are enabled by default. They can be manually disabled via the configuration (which again, can be edited
-in-game using [BepInEx.ConfigurationManager](https://github.com/BepInEx/BepInEx.ConfigurationManager)). Additionaly, the
-bug fixes have some safety checks to try and detect if future versions of Lunacid are incompatible with my bug fixes. If
-these checks fail, the bug fixes will automatically disable and vanilla behavior will be used instead.
+All bug fixes are enabled by default. Some of them can be manually disabled via the configuration in case you prefer the
+bugged vanilla behavior.
 
-- **Fix All-Spell Check**: Fixes the check that calculates if you have all spells. In vanilla, it counts spells that
-  aren't normally obtainable, such as the Jingle Bells and !DEVMODE spells. The bug means you might pass the all spell
-  check when you're still missing spells. Because this mod makes the Jingle Bells spell trivial to obtain, the bug
-  becomes a much larger issue than it'd normally be.
-- **Fix All-Weapon Check**: Fixes the check that calculates if you have all weapons. In vanilla, the check breaks if the
-  Shadow/Shining blade has nonzero weapon XP. Also, Kira checks to make sure you have 48 or more weapons... but it's 
-  possible to obtain 50 distinct weapons. My best guess its that Kira didn't want to count the two weapons you can lose
-  later.
+### Fix All-Spell Check
+
+Fixes the check that calculates if you have all spells. Without the bugfix you you might pass the all spell check when
+you're still missing spells, causing you to recieve the Steam achievment early.
+
+<details>
+<summary><b>SPOILER:</b> additional details</summary>
+Specifically, the game checks to see if you have at least 36 spells, but Jingle Bells or !DEVMODE spells can push you
+past that threshold early. This bugfix reimplements the check to make sure you have all 36 of the normal playthough
+spells. Note that this affects both the Steam achievment *and* Ending E.
+</details>
+
+### Fix All-Weapon Check
+
+Fixes the check that calculates if you have all weapons. Without the bugfix the Steam achievment is often impossible to
+obtain without a workaround.
+
+<details>
+<summary><b>SPOILER:</b> additional details</summary>
+In vanilla, the check fails to count the Shadow/Shining blade if it has nonzero weapon XP. Also, Kira checks to make
+sure you have 48 or more weapons... but it's possible to obtain 50 distinct weapons in a normal playthrough, meaning you
+might even get the Steam achievment while you're still missing weapons.
+</details>
+
+### Fix Real-Time Checks
+
+The game keeps track of real time passage for certain things. This timer has a number of bugs that can cause it to
+behave erratically in vanilla. This bugfix cannot be disabled.
+
+<details>
+<summary><b>SPOILER:</b> additional details</summary>
+This specifically fixes the timer that Daedalus uses when he tells you to "come back soon". 
+</details>
 
 ## License
 
