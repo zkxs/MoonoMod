@@ -29,12 +29,20 @@ namespace MoonoMod
         // the scaling type value that means an NPC scales based on MOON_MULT
         private readonly static int SCALING_TYPE_MOON = 1;
 
+        // the so-called "unlimited" FPS setting's value
+        private readonly static int FPS_SETTING_UNLIMITED = 2;
+
+        // how many FPS below your monitor's maximum refresh rate to target.
+        // This helps adaptive refresh rate monitors, as it reduces the chance of exceeding their refresh rate limit when VSync is off.
+        private readonly static int FPS_HEADROOM = 5;
+
         internal static new ManualLogSource? Logger;
 
         internal static ConfigEntry<bool>? fullMoon;
         internal static ConfigEntry<bool>? skipWaits;
         internal static ConfigEntry<bool>? christmas;
         internal static ConfigEntry<bool>? summer;
+        internal static ConfigEntry<bool>? disableVsync;
         internal static ConfigEntry<bool>? fixAllSpellCheck;
         internal static ConfigEntry<bool>? fixAllWeaponCheck;
         internal static ConfigEntry<bool>? allLoot;
@@ -53,6 +61,7 @@ namespace MoonoMod
                 skipWaits = Config.Bind("General", "Skip Waits", false, "Force all checks to see if the player has waited some duration of time (sometimes minutes, somtimes months) to pass.");
                 christmas = Config.Bind("General", "Force Christmas", false, "Force Christmas exclusive objects to appear on level load, and allow the Jingle Bells spell to be cast.");
                 summer = Config.Bind("General", "Force Summer", false, "Force Summer exclusive objects to appear on level load.");
+                disableVsync = Config.Bind("General", "Disable VSync with high FPS", false, "Forcibly disables VSync when using the high FPS option. Designed for adapative refresh rate monitors.");
                 fixAllSpellCheck = Config.Bind("Bugfixes", "Fix All-Spell Check", true, "Fix the all-spell check to not include normally unobtainable spells in your total.");
                 fixAllWeaponCheck = Config.Bind("Bugfixes", "Fix All-Weapon Check", true, "Fix the all-weapon check to not not break if your Shadow/Shining blade has nonzero weapon XP.");
 
@@ -75,6 +84,9 @@ namespace MoonoMod
                 AllWeapons.Init();
 
                 harmony.PatchAll();
+
+                disableVsync.SettingChanged += (sender, args) => Logger.LogInfo("woah");
+
                 Logger.LogInfo("You're about to hack time, are you sure?"); // kung fury quote
             }
             catch (Exception e)
@@ -294,6 +306,27 @@ namespace MoonoMod
                 return FullMoonTranspiler(instructions);
             }
 
+            // Always enable objects that are Christmas-exclusive. This is mostly decorations, but also the Christmas spell.
+            [HarmonyPrefix]
+            [HarmonyPatch(typeof(CONTROL), nameof(CONTROL.SetFPS))]
+            private static bool DisableVsync(CONTROL __instance)
+            {
+                if (disableVsync!.Value && __instance.CURRENT_SYS_DATA.SETTING_EX7 == FPS_SETTING_UNLIMITED)
+                {
+                    Application.targetFrameRate = Screen.currentResolution.refreshRate - FPS_HEADROOM;
+                    QualitySettings.vSyncCount = 0;
+                    if (debugLogs?.Value ?? false)
+                    {
+                        Logger!.LogInfo($"Set target FPS to {Application.targetFrameRate}");
+                    }
+                    return false; // skip original method
+                }
+                else
+                {
+                    return true; // run original method
+                }
+            }
+
 #if DEBUG
             // log levels that contain full moon exclusive objects
             [HarmonyPrefix]
@@ -306,9 +339,7 @@ namespace MoonoMod
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains a full moon check. MOON_MULT = {__instance.MOON.MOON_MULT}. Pass = {passed}.");
                 }
             }
-#endif
 
-#if DEBUG
             // log levels that contain materials or lights affected by MOON_MULT
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Moon_Light), "OnEnable")]
@@ -319,9 +350,7 @@ namespace MoonoMod
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains {__instance.Mats.Length} materials and {__instance.Lights.Length} lights affected by MOON_MULT ({__instance.MOON.MOON_MULT}).");
                 }
             }
-#endif
 
-#if DEBUG
             // log levels that enemies with moon-based health scaling
             [HarmonyPrefix]
             [HarmonyPatch(typeof(NPC_Scaling), "Scale_NPC")]
@@ -333,9 +362,7 @@ namespace MoonoMod
                     Logger!.LogInfo($"Level {SceneManager.GetActiveScene().name} contains NPC {__instance.AI.gameObject.name} with health scaled by {scale_factor} to {__instance.AI.health_max} by MOON_MULT ({__instance.MOON.MOON_MULT}).");
                 }
             }
-#endif
 
-#if DEBUG
             // drop all possible loot from an enemy (instead of just one item from the loot table). THIS IS CHEATING! I used this to debug the all weapons achievement check, because ain't no way I was gonna get both an Obsidian Cursebrand and an Obsidian Posisonguard naturally.
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Loot_scr), "OnEnable")]
