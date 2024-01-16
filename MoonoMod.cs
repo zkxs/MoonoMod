@@ -114,6 +114,35 @@ namespace MoonoMod
             }
         }
 
+        // used to hijacking all DateTime.Now calls the transpiled method makes and replace the date with that of a full moon
+        private static IEnumerable<CodeInstruction> FullMoonTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var codes = new List<CodeInstruction>(instructions);
+            var nowMethod = AccessTools.DeclaredPropertyGetter(typeof(DateTime), nameof(DateTime.Now));
+            var fakeMethod = AccessTools.DeclaredMethod(typeof(MoonoMod), nameof(FullMoonDate));
+
+            bool replacedAny = false;
+
+            for (int index = 0; index < codes.Count; index += 1)
+            {
+                if (codes[index].Calls(nowMethod))
+                {
+                    // replace with a call to our faked DateTime.Now()
+                    codes[index] = new CodeInstruction(OpCodes.Call, fakeMethod);
+                    replacedAny = true;
+                }
+            }
+
+            if (replacedAny)
+            {
+                return codes;
+            }
+            else
+            {
+                throw new TranspilerException("could not find any DateTime.Now calls to patch");
+            }
+        }
+
         [HarmonyPatch]
         private static class HarmonyPatches
         {
@@ -247,35 +276,20 @@ namespace MoonoMod
                 throw new TranspilerException("could not find DateTime.Now call after LDSTR \"SANTA_CAST\" to patch");
             }
 
-            // Make it always a full moon. This is achieved by hijacking all DateTime.Now calls SimpleMoon makes.
+            // Make it always a full moon. This is used for MOON_MULT and Spawn_if_moon checks.
             [HarmonyTranspiler]
             [HarmonyPatch(typeof(SimpleMoon), "Start")]
-            private static IEnumerable<CodeInstruction> FullMoon(IEnumerable<CodeInstruction> instructions)
+            private static IEnumerable<CodeInstruction> SimpleMoon(IEnumerable<CodeInstruction> instructions)
             {
-                var codes = new List<CodeInstruction>(instructions);
-                var nowMethod = AccessTools.DeclaredPropertyGetter(typeof(DateTime), nameof(DateTime.Now));
-                var fakeMethod = AccessTools.DeclaredMethod(typeof(MoonoMod), nameof(FullMoonDate));
+                return FullMoonTranspiler(instructions);
+            }
 
-                bool replacedAny = false;
-
-                for (int index = 0; index < codes.Count; index += 1)
-                {
-                    if (codes[index].Calls(nowMethod))
-                    {
-                        // replace with a call to our faked DateTime.Now()
-                        codes[index] = new CodeInstruction(OpCodes.Call, fakeMethod);
-                        replacedAny = true;
-                    }
-                }
-
-                if (replacedAny)
-                {
-                    return codes;
-                }
-                else
-                {
-                    throw new TranspilerException("could not find any DateTime.Now calls to patch");
-                }
+            // Make it always a full moon. I'm not sure if this class is used by the game.
+            [HarmonyTranspiler]
+            [HarmonyPatch(typeof(Moon_scr), "Start")]
+            private static IEnumerable<CodeInstruction> MoonScr(IEnumerable<CodeInstruction> instructions)
+            {
+                return FullMoonTranspiler(instructions);
             }
 
 #if DEBUG
