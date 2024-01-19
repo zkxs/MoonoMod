@@ -272,7 +272,7 @@ namespace MoonoMod
                     int month = DateTime.Now.Month;
                     active = month > 2 && month < 9;
                 }
-                __instance.transform.GetChild(0).gameObject.SetActive(active);
+                __instance.transform.GetChild(0)?.gameObject?.SetActive(active);
                 return false; // skip original method
             }
 
@@ -314,7 +314,7 @@ namespace MoonoMod
                         active = currentMonth > targetMonth;
                     }
 
-                    __instance.transform.GetChild(0).gameObject.SetActive(active);
+                    __instance.transform.GetChild(0)?.gameObject?.SetActive(active);
                     return false; // skip original method
                 }
             }
@@ -411,7 +411,7 @@ namespace MoonoMod
                     active = now.Month == 12 && now.Day >= (___EXACT ? 25 : 10);
                 }
 
-                __instance.transform.GetChild(0).gameObject.SetActive(active);
+                __instance.transform.GetChild(0)?.gameObject?.SetActive(active);
                 return false; // skip original method
             }
 
@@ -491,7 +491,7 @@ namespace MoonoMod
             // Patch Spawn_if_moon to allow disabling the objects if OnEnable is ran again
             [HarmonyPrefix]
             [HarmonyPatch(typeof(Spawn_if_moon), "OnEnable")]
-            private static bool LogMoonCheck(Spawn_if_moon __instance, GameObject[] ___TARGETS)
+            private static bool SpawnIfMoon(Spawn_if_moon __instance, GameObject[] ___TARGETS)
             {
                 bool active = __instance.MOON.MOON_MULT > 9.0;
                 if (debugLogs?.Value ?? false)
@@ -501,8 +501,11 @@ namespace MoonoMod
 
                 foreach (GameObject gameObject in ___TARGETS)
                 {
-                    gameObject.SetActive(active);
+                    gameObject?.SetActive(active);
                 }
+
+                //TODO: when changing from false to true, GA-MANGETSU destroy the Lunaga they replace via a Kill_Other component.
+                // then when going from true to false, the lunaga are dead forever.
 
                 return false; // skip original method
             }
